@@ -1,1 +1,2 @@
 *.cbp #ignore the cbp file for codeblocks
+*.layout
