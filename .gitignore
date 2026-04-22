@@ -1,3 +1,4 @@
 #ignore the codeblocks files
 *.cbp 
 *.layout
+*.depend
