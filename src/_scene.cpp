@@ -48,7 +48,7 @@ GLint _scene::initGL()
 
     //myQuad->initQuad("images/crate.png");
 
-    ply->plyInit(8, 4, "images/ply.png");
+    ply->plyInit(3, 8, "images/SpriteSheet.png");
 
     //snds->initSound();
     //sds->playMusic("sounds/BackOnTrack.mp3");
@@ -107,9 +107,9 @@ void _scene::drawScene()
 
     ply->playerActions(deltaTime);
     ply->updateQuad();
-    ply->scale.x = 0.5;
-    ply->scale.y = 0.5;
-    ply->scale.z = 0.5;
+    ply->scale.x = 0.25;
+    ply->scale.y = 0.25;
+    ply->scale.z = 0.25;
     //ply->pos.y = -1.4;
     ply->drawQuad();
 
