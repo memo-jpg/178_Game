@@ -29,6 +29,12 @@ class _scene
         int winMsg(HWND	hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
         void mouseMapping(int, int);
+        void setupCollisionMap();
+        rect2D playerBoundsAt(vec3) const;
+        bool collidesWithWall(vec3) const;
+        bool fallsIntoPit(vec3) const;
+        void respawnPlayer();
+        void drawCollisionDebug() const;
         static float deltaTime;
         //auto lastTime = chrono::steady_clock::now();
 
@@ -47,6 +53,12 @@ class _scene
         vec2 dim;   // window size
 
         int clickCount = 0; // temp variable to count mouse clicks used in bullets
+        std::vector<rect2D> wallZones;
+        std::vector<rect2D> pitZones;
+        vec3 playerSpawn;
+        float playerHalfWidth = 0.20f;
+        float playerHalfHeight = 0.18f;
+        bool showCollisionDebug = true;
 
     protected:
 

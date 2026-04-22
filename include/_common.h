@@ -12,6 +12,7 @@
 #include<chrono>
 #include<random>
 #include<fstream>
+#include<vector>
 
 #define PI 3.14159
 #define GLEW_STATIC
@@ -33,6 +34,15 @@ typedef struct{
     float x;
     float y;
 }vec2;
+
+typedef struct{
+
+    float left;
+    float right;
+    float bottom;
+    float top;
+
+}rect2D;
 
 
 #endif // _COMMON_H

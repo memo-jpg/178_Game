@@ -14,6 +14,8 @@ class _collisionCheck
         //positions, radius, threshold
 
         bool isPlanoCol(vec3, vec3);
+        bool isPointInRect(vec3, rect2D);
+        bool isRectCollide(rect2D, rect2D);
 
     protected:
 

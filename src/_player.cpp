@@ -46,8 +46,8 @@ void _player::playerActions(float deltaT)
             if(timer>0.08){
                 xMin += 1.0/(float)xFrames;
                 xMax += 1.0/(float)xFrames;
-                yMax = 2.0/(float)yFrames;
-                yMin = 1.0/(float)yFrames;
+                yMax = 2.0/(float)yFrames;;
+                yMin = 1.0/(float)yFrames;;
 
                 pos.x -= 2*deltaT + 0.1;
 
@@ -58,8 +58,8 @@ void _player::playerActions(float deltaT)
             if(timer>0.08){
                 xMin += 1.0/(float)xFrames;
                 xMax += 1.0/(float)xFrames;
-                yMax = 3.0/(float)yFrames;
-                yMin = 2.0/(float)yFrames;
+                yMax = 3.0/(float)yFrames;;
+                yMin = 2.0/(float)yFrames;;
 
                 pos.x += 2*deltaT + 0.1;
 
@@ -70,8 +70,8 @@ void _player::playerActions(float deltaT)
             if(timer>0.08){
                 xMin += 1.0/(float)xFrames;
                 xMax += 1.0/(float)xFrames;
-                yMax = 4.0/(float)yFrames;
-                yMin = 3.0/(float)yFrames;
+                yMax = 4.0/(float)yFrames;;
+                yMin = 3.0/(float)yFrames;;
 
                 pos.y += 2*deltaT + 0.1;
 
@@ -82,8 +82,8 @@ void _player::playerActions(float deltaT)
             if(timer>0.08){
                 xMin += 1.0/(float)xFrames;
                 xMax += 1.0/(float)xFrames;
-                yMax = 1.0/(float)yFrames;
-                yMin = 0.0/(float)yFrames;
+                yMax = 1.0/(float)yFrames;;
+                yMin = 0.0/(float)yFrames;;
 
                 pos.y -= 2*deltaT + 0.1;
 
