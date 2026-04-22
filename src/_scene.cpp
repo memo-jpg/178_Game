@@ -68,9 +68,11 @@ GLint _scene::initGL()
     ply->plyInit(3, 8, "images/SpriteSheet.png");
     respawnPlayer();
     setupCollisionMap();
+    stateManager->init();   //init game state
 
-    //snds->initSound();
-    //sds->playMusic("sounds/BackOnTrack.mp3");
+
+    snds->initSound();
+    snds->playMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
 
     return true;
 }
@@ -214,8 +216,11 @@ void _scene::drawScene()
     auto currenTime = chrono::steady_clock::now();
 
     chrono::duration<float> elapsed = currenTime - lastTime;
-    _scene::deltaTime = elapsed.count();
-
+    if (stateManager->currentState == PLAYING) {
+        _scene::deltaTime = elapsed.count();
+    } else {
+        _scene::deltaTime = 0.0f;
+    }   //Modified timer to enable pause feature
     lastTime = currenTime;
 
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);   // Clear buffers
@@ -231,45 +236,59 @@ void _scene::drawScene()
     //Mymodel->drawModel();
     //myVBO->drawmodel();
 
-    glPushMatrix();
-    glScalef(13.3, 13.3, 1);
-    myPrlx->drawBackground(dim.x, dim.y);
-    //myPrlx->scroll(true, myPrlx->UP, 0.00005);
-    //myPrlx->scroll(true, myPrlx->RIGHT, 0.05 * deltaTime);
-    glPopMatrix();
 
-    vec3 previousPlayerPos = ply->pos;
-    ply->playerActions(deltaTime);
+    if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU) {
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_LIGHTING);
+        glColor3f(1.0,0,1.0);
 
-    if (collidesWithWall(ply->pos))
-    {
-        ply->pos = previousPlayerPos;
+        //Game objects now go here
+        glPushMatrix();
+        glScalef(13.3, 13.3, 1);
+        myPrlx->drawBackground(dim.x, dim.y);
+        glPopMatrix();
+
+        vec3 previousPlayerPos = ply->pos;
+        ply->playerActions(deltaTime);
+
+        if (collidesWithWall(ply->pos))
+        {
+            ply->pos = previousPlayerPos;
+        }
+
+        if (fallsIntoPit(ply->pos))
+        {
+            respawnPlayer();
+        }
+
+        ply->updateQuad();
+        ply->scale.x = 0.25;
+        ply->scale.y = 0.25;
+        ply->scale.z = 0.25;
+        //ply->pos.y = -1.4;
+        ply->drawQuad();
+        drawCollisionDebug();
+
+
+        glPushMatrix();
+
+        glDisable(GL_TEXTURE_2D);
+        //glTranslatef(0, 0, -6);
+        glTranslatef(mouse.x, mouse.y, mouse.z);
+        //glutSolidTeapot(0.2);
+        glEnable(GL_TEXTURE_2D);
+        glDisable(GL_LIGHTING);
+
+        glPopMatrix();
+
     }
 
-    if (fallsIntoPit(ply->pos))
-    {
-        respawnPlayer();
-    }
-
-    ply->updateQuad();
-    ply->scale.x = 0.25;
-    ply->scale.y = 0.25;
-    ply->scale.z = 0.25;
-    //ply->pos.y = -1.4;
-    ply->drawQuad();
-    drawCollisionDebug();
+    stateManager->draw();
 
 
-    glPushMatrix();
 
-    glDisable(GL_TEXTURE_2D);
-    //glTranslatef(0, 0, -6);
-    glTranslatef(mouse.x, mouse.y, mouse.z);
-    //glutSolidTeapot(0.2);
-    glEnable(GL_TEXTURE_2D);
-    glDisable(GL_LIGHTING);
 
-    glPopMatrix();
+
 
 
 }
@@ -296,6 +315,8 @@ void _scene::mouseMapping(int x, int y)
 
 int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+    float mouseX = LOWORD(lParam);
+    float mouseY = HIWORD(lParam);
     switch(uMsg){
     case WM_KEYDOWN:
         if (wParam == VK_F2)
@@ -348,6 +369,8 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         myKbMs->mouseWheel(Mymodel, (double)GET_WHEEL_DELTA_WPARAM(wParam));
         break;
     }
+    stateManager->processInput(uMsg, wParam, mouseX, mouseY, dim.x, dim.y);    //State manager inputs
+
 
     return 0;
 }

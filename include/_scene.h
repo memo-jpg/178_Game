@@ -15,6 +15,7 @@
 #include<_bullets.h>
 #include<_particles.h>
 #include<_shader.h>
+#include<_gamestate.h>
 
 class _scene
 {
@@ -47,6 +48,8 @@ class _scene
         _player *ply = new _player();
         _sounds *snds = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
+        _gameState *stateManager = new _gameState;
+
 
 
         vec3 mouse; // to keep track of the mouse location
