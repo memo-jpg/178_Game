@@ -71,8 +71,8 @@ GLint _scene::initGL()
     stateManager->init();   //init game state
 
 
-    snds->initSound();
-    snds->playMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
+    //snds->initSound();
+    //sds->playMusic("sounds/BackOnTrack.mp3");
 
     return true;
 }
