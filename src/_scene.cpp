@@ -337,6 +337,9 @@ void _scene::drawScene()
         sfx->playSounds("sounds/attack.mp3");
     }
 
+    if(ply->actionTrigger == ply->LEFTWALK || ply->actionTrigger == ply->RIGHTWALK || ply->actionTrigger == ply->WALKDOWN || ply->actionTrigger == ply->WALKUP){
+        sfx->playSounds("sounds/8 bit walk cycle.mp3");
+    }
 
     if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU) {
         glEnable(GL_DEPTH_TEST);
