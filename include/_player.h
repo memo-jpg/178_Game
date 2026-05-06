@@ -3,6 +3,7 @@
 
 #include<_common.h>
 #include<_quad.h>
+#include "_sounds.h"
 
 class _player:public _quad
 {
@@ -37,6 +38,7 @@ class _player:public _quad
         rect2D collisionBoundsAt(vec3 position) const;
         rect2D collisionBounds() const;
         rect2D attackBounds() const;
+
 
     protected:
 

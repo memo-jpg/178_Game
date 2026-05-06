@@ -20,6 +20,7 @@ _player::_player()
     actionTrigger = STAND;
     facingDirection = FACE_DOWN;
     isAttackActive = false;
+
 }
 
 _player::~_player()
@@ -238,6 +239,7 @@ void _player::playerActions(float deltaT)
         case STAND:
             setIdleFrame();
             break;
+
         case LEFTWALK:
             facingDirection = FACE_LEFT;
             pos.x -= moveSpeed * deltaT;
@@ -247,6 +249,7 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
+
         case RIGHTWALK:
             facingDirection = FACE_RIGHT;
             pos.x += moveSpeed * deltaT;
@@ -256,6 +259,7 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
+
         case WALKUP:
             facingDirection = FACE_UP;
             pos.y += moveSpeed * deltaT;
@@ -265,6 +269,7 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
+
         case WALKDOWN:
             facingDirection = FACE_DOWN;
             pos.y -= moveSpeed * deltaT;
@@ -273,6 +278,7 @@ void _player::playerActions(float deltaT)
 
                 timer = 0;
             }
+            break;
 
         case BLOCK:
             break;

@@ -79,8 +79,9 @@ GLint _scene::initGL()
     stateManager->init();   //init game state
 
 
-    //snds->initSound();
-    //sds->playMusic("sounds/BackOnTrack.mp3");
+    snds->initSound();
+    sfx->initSound();
+    snds->playMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
 
     return true;
 }
@@ -331,6 +332,10 @@ void _scene::drawScene()
 
     //Mymodel->drawModel();
     //myVBO->drawmodel();
+
+    if(ply->actionTrigger == ply->ATTACK){
+        sfx->playSounds("sounds/attack.mp3");
+    }
 
 
     if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU) {

@@ -13,6 +13,7 @@
 #include<_common.h>         // for common headers
 #include<_scene.h>          // my scene context
 
+
 HDC			hDC=NULL;		// Private GDI Device Context
 HGLRC		hRC=NULL;		// Permanent Rendering Context
 HWND		hWnd=NULL;		// Holds Our Window Handle

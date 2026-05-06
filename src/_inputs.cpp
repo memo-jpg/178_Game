@@ -3,7 +3,6 @@
 _inputs::_inputs()
 {
     //ctor
-
     isRotate = false;
     isTranslate = false;
 }
@@ -12,6 +11,7 @@ _inputs::~_inputs()
 {
     //dtor
 }
+
 void _inputs::keyPressed(_model *mdl)
 {
     //cout<< wParam << endl;
