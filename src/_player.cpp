@@ -89,7 +89,16 @@ void _player::playerActions(float deltaT)
 
                 timer = 0;
             }
+        case ATTACK:
             break;
+
+        case BLOCK:
+            break;
+
+        case HIT: //for when the PLAYER gets hit
+            break;
+
+
         default: break;
 
     }

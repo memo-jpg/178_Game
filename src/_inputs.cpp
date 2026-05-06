@@ -155,5 +155,17 @@ void _inputs::keyPressed(_player* qD)
     case VK_DOWN:
         qD->actionTrigger = qD->WALKDOWN;
         break;
+
+    case VK_SPACE: //space bar
+        qD->actionTrigger = qD->ATTACK;
+        break;
+
+    case VK_SHIFT: //shift key
+        qD->actionTrigger = qD->BLOCK;
+        break;
+
+    default:
+        qD->actionTrigger = qD->STAND;
+        break;
     }
 }
