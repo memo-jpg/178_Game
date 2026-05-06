@@ -16,6 +16,7 @@
 #include<_particles.h>
 #include<_shader.h>
 #include<_gamestate.h>
+#include<_dungeon.h>
 
 class _scene
 {
@@ -31,7 +32,9 @@ class _scene
 
         void mouseMapping(int, int);
         void setupCollisionMap();
-        rect2D playerBoundsAt(vec3) const;
+        void setupDungeon();
+        void enterDungeon1();
+        void syncPlayerToDungeon();
         bool collidesWithWall(vec3) const;
         bool fallsIntoPit(vec3) const;
         void respawnPlayer();
@@ -49,6 +52,7 @@ class _scene
         _sounds *snds = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
         _gameState *stateManager = new _gameState;
+        _dungeon *dungeon1 = new _dungeon();
 
 
 
@@ -59,8 +63,9 @@ class _scene
         std::vector<rect2D> wallZones;
         std::vector<rect2D> pitZones;
         vec3 playerSpawn;
-        float playerHalfWidth = 0.20f;
-        float playerHalfHeight = 0.18f;
+        vec3 overworldSpawn;
+        rect2D dungeonEntranceZone;
+        bool inDungeon = false;
         bool showCollisionDebug = true;
 
     protected:

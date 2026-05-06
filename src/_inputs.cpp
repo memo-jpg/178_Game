@@ -133,11 +133,17 @@ void _inputs::mouseWheel(_modelVBO* mdlv, double delta)
 
 void _inputs::keyPressed(_player* qD)
 {
+    if (qD->isAttackActive)
+    {
+        return;
+    }
+
     switch(wParam){
     case VK_LEFT:
         //qD->xMax -= 0.9/(float)qD->xFrames;
         //qD->xMin -= 0.9/(float)qD->xFrames;
 
+        qD->facingDirection = _player::FACE_LEFT;
         qD->actionTrigger = qD->LEFTWALK;
         break;
 
@@ -145,19 +151,23 @@ void _inputs::keyPressed(_player* qD)
         //qD->xMax += 0.9/(float)qD->xFrames;
         //qD->xMin += 0.9/(float)qD->xFrames;
 
+        qD->facingDirection = _player::FACE_RIGHT;
         qD->actionTrigger = qD->RIGHTWALK;
         break;
 
     case VK_UP:
+        qD->facingDirection = _player::FACE_UP;
         qD->actionTrigger = qD->WALKUP;
         break;
 
     case VK_DOWN:
+        qD->facingDirection = _player::FACE_DOWN;
         qD->actionTrigger = qD->WALKDOWN;
         break;
 
     case VK_SPACE: //space bar
         qD->actionTrigger = qD->ATTACK;
+        qD->startAttack();
         break;
 
     case VK_SHIFT: //shift key
@@ -166,6 +176,6 @@ void _inputs::keyPressed(_player* qD)
 
     default:
         qD->actionTrigger = qD->STAND;
-        break;
+
     }
 }
