@@ -12,7 +12,10 @@
 #include<chrono>
 #include<random>
 #include<fstream>
+#include<sstream>
+#include<string>
 #include<vector>
+#include<algorithm>
 
 #define PI 3.14159
 #define GLEW_STATIC

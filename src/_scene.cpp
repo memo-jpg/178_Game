@@ -28,6 +28,9 @@ _scene::_scene()
     playerSpawn.x = 0;
     playerSpawn.y = -0.8f;
     playerSpawn.z = -8.0f;
+
+    overworldSpawn = playerSpawn;
+    dungeonEntranceZone = makeRect(-0.50f, 0.50f, 0.35f, 0.95f);
 }
 
 _scene::~_scene()
@@ -42,6 +45,7 @@ _scene::~_scene()
     delete ply;
     delete snds;
     delete hit;
+    delete dungeon1;
 }
 
 GLint _scene::initGL()
@@ -66,8 +70,12 @@ GLint _scene::initGL()
     //myQuad->initQuad("images/crate.png");
 
     ply->plyInit(3, 8, "images/SpriteSheet.png");
+    ply->scale.x = 0.25f;
+    ply->scale.y = 0.25f;
+    ply->scale.z = 0.25f;
     respawnPlayer();
     setupCollisionMap();
+    setupDungeon();
     stateManager->init();   //init game state
 
 
@@ -118,17 +126,46 @@ void _scene::setupCollisionMap()
     pitZones.push_back(makeRect(-0.75f, 0.75f, -1.60f, -1.10f));
 }
 
-rect2D _scene::playerBoundsAt(vec3 position) const
+void _scene::setupDungeon()
 {
-    return makeRect(position.x - playerHalfWidth,
-                    position.x + playerHalfWidth,
-                    position.y - playerHalfHeight,
-                    position.y + playerHalfHeight);
+    dungeon1->loadDungeon("images/Dungeons/level1.png", "images/Dungeons/level1_rooms.txt");
+}
+
+void _scene::syncPlayerToDungeon()
+{
+    if (!inDungeon || !dungeon1->isLoaded())
+    {
+        return;
+    }
+
+    const float scale = dungeon1->currentPlayerScale();
+    ply->scale.x = scale;
+    ply->scale.y = scale;
+    ply->scale.z = scale;
+}
+
+void _scene::enterDungeon1()
+{
+    if (!dungeon1->isLoaded())
+    {
+        return;
+    }
+
+    inDungeon = true;
+    dungeon1->enterRoom("top_room");
+    syncPlayerToDungeon();
+    ply->pos = dungeon1->currentSpawnWorld();
+    ply->finishAttack();
 }
 
 bool _scene::collidesWithWall(vec3 position) const
 {
-    rect2D playerBox = playerBoundsAt(position);
+    rect2D playerBox = ply->collisionBoundsAt(position);
+
+    if (inDungeon)
+    {
+        return dungeon1->collidesWithWall(playerBox);
+    }
 
     for (size_t i = 0; i < wallZones.size(); i++)
     {
@@ -143,7 +180,12 @@ bool _scene::collidesWithWall(vec3 position) const
 
 bool _scene::fallsIntoPit(vec3 position) const
 {
-    rect2D playerBox = playerBoundsAt(position);
+    if (inDungeon)
+    {
+        return false;
+    }
+
+    rect2D playerBox = ply->collisionBoundsAt(position);
 
     for (size_t i = 0; i < pitZones.size(); i++)
     {
@@ -159,52 +201,106 @@ bool _scene::fallsIntoPit(vec3 position) const
 void _scene::respawnPlayer()
 {
     ply->pos = playerSpawn;
-    ply->actionTrigger = ply->STAND;
+    ply->finishAttack();
+
+    if (!inDungeon)
+    {
+        ply->scale.x = 0.25f;
+        ply->scale.y = 0.25f;
+        ply->scale.z = 0.25f;
+    }
 }
 
+// DRAW COLLISION BOXES
 void _scene::drawCollisionDebug() const
 {
-    if (!showCollisionDebug)
+    if (!showCollisionDebug && !ply->isAttackActive)
     {
         return;
     }
+
+    const float debugZ = (float)ply->pos.z + 0.01f;
 
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_LIGHTING);
     glLineWidth(2.0f);
 
-    for (size_t i = 0; i < wallZones.size(); i++)
+    if (showCollisionDebug)
     {
-        const rect2D& zone = wallZones[i];
-        glColor3f(1.0f, 0.2f, 0.2f);
+        if (inDungeon)
+        {
+            dungeon1->drawCollisionDebug();
+        }
+        else
+        {
+            for (size_t i = 0; i < wallZones.size(); i++)
+            {
+                const rect2D& zone = wallZones[i];
+                glColor3f(1.0f, 0.2f, 0.2f);
+                glBegin(GL_LINE_LOOP);
+                    glVertex3f(zone.left, zone.bottom, debugZ);
+                    glVertex3f(zone.right, zone.bottom, debugZ);
+                    glVertex3f(zone.right, zone.top, debugZ);
+                    glVertex3f(zone.left, zone.top, debugZ);
+                glEnd();
+            }
+
+            for (size_t i = 0; i < pitZones.size(); i++)
+            {
+                const rect2D& zone = pitZones[i];
+                glColor3f(1.0f, 0.9f, 0.1f);
+                glBegin(GL_LINE_LOOP);
+                    glVertex3f(zone.left, zone.bottom, debugZ);
+                    glVertex3f(zone.right, zone.bottom, debugZ);
+                    glVertex3f(zone.right, zone.top, debugZ);
+                    glVertex3f(zone.left, zone.top, debugZ);
+                glEnd();
+            }
+
+            glColor3f(0.2f, 0.8f, 1.0f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(dungeonEntranceZone.left, dungeonEntranceZone.bottom, debugZ);
+                glVertex3f(dungeonEntranceZone.right, dungeonEntranceZone.bottom, debugZ);
+                glVertex3f(dungeonEntranceZone.right, dungeonEntranceZone.top, debugZ);
+                glVertex3f(dungeonEntranceZone.left, dungeonEntranceZone.top, debugZ);
+            glEnd();
+        }
+
+        rect2D playerBox = ply->collisionBounds();
+        glColor3f(0.2f, 1.0f, 0.2f);
         glBegin(GL_LINE_LOOP);
-            glVertex3f(zone.left, zone.bottom, -7.6f);
-            glVertex3f(zone.right, zone.bottom, -7.6f);
-            glVertex3f(zone.right, zone.top, -7.6f);
-            glVertex3f(zone.left, zone.top, -7.6f);
+            glVertex3f(playerBox.left, playerBox.bottom, debugZ);
+            glVertex3f(playerBox.right, playerBox.bottom, debugZ);
+            glVertex3f(playerBox.right, playerBox.top, debugZ);
+            glVertex3f(playerBox.left, playerBox.top, debugZ);
         glEnd();
     }
 
-    for (size_t i = 0; i < pitZones.size(); i++)
+    if (ply->isAttackActive)
     {
-        const rect2D& zone = pitZones[i];
-        glColor3f(1.0f, 0.9f, 0.1f);
-        glBegin(GL_LINE_LOOP);
-            glVertex3f(zone.left, zone.bottom, -7.6f);
-            glVertex3f(zone.right, zone.bottom, -7.6f);
-            glVertex3f(zone.right, zone.top, -7.6f);
-            glVertex3f(zone.left, zone.top, -7.6f);
-        glEnd();
-    }
+        rect2D attackBox = ply->attackBounds();
 
-    rect2D playerBox = playerBoundsAt(ply->pos);
-    glColor3f(0.2f, 1.0f, 0.2f);
-    glBegin(GL_LINE_LOOP);
-        glVertex3f(playerBox.left, playerBox.bottom, -7.5f);
-        glVertex3f(playerBox.right, playerBox.bottom, -7.5f);
-        glVertex3f(playerBox.right, playerBox.top, -7.5f);
-        glVertex3f(playerBox.left, playerBox.top, -7.5f);
-    glEnd();
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glColor4f(0.95f, 0.95f, 0.20f, 0.25f);
+        glBegin(GL_QUADS);
+            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.top, debugZ);
+            glVertex3f(attackBox.left, attackBox.top, debugZ);
+        glEnd();
+
+        glColor3f(1.0f, 0.95f, 0.25f);
+        glBegin(GL_LINE_LOOP);
+            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.top, debugZ);
+            glVertex3f(attackBox.left, attackBox.top, debugZ);
+        glEnd();
+
+        glDisable(GL_BLEND);
+    }
 
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
@@ -243,30 +339,51 @@ void _scene::drawScene()
         glColor3f(1.0,0,1.0);
 
         //Game objects now go here
-        glPushMatrix();
-        glScalef(13.3, 13.3, 1);
-        myPrlx->drawBackground(dim.x, dim.y);
-        glPopMatrix();
+        if (!inDungeon)
+        {
+            glPushMatrix();
+            glScalef(13.3, 13.3, 1);
+            myPrlx->drawBackground(dim.x, dim.y);
+            glPopMatrix();
+        }
+        else
+        {
+            dungeon1->drawCurrentRoom();
+        }
 
         vec3 previousPlayerPos = ply->pos;
         ply->playerActions(deltaTime);
 
-        if (collidesWithWall(ply->pos))
+        if (inDungeon)
+        {
+            rect2D playerBox = ply->collisionBounds();
+            if (dungeon1->updateRoomTransition(ply->pos, playerBox))
+            {
+                syncPlayerToDungeon();
+            }
+            else if (collidesWithWall(ply->pos))
+            {
+                ply->pos = previousPlayerPos;
+            }
+        }
+        else if (collidesWithWall(ply->pos))
         {
             ply->pos = previousPlayerPos;
         }
 
-        if (fallsIntoPit(ply->pos))
+        if (!inDungeon && fallsIntoPit(ply->pos))
         {
             respawnPlayer();
         }
 
+        if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeonEntranceZone))
+        {
+            enterDungeon1();
+        }
+
         ply->updateQuad();
-        ply->scale.x = 0.25;
-        ply->scale.y = 0.25;
-        ply->scale.z = 0.25;
         //ply->pos.y = -1.4;
-        ply->drawQuad();
+        ply->drawPlayer();
         drawCollisionDebug();
 
 
@@ -325,6 +442,11 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        if (stateManager->currentState != PLAYING)
+        {
+            break;
+        }
+
         myKbMs->wParam = wParam;
         myKbMs->keyPressed(Mymodel);
         //cout << "came here "<< endl;
@@ -334,7 +456,25 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_KEYUP:
-        ply->actionTrigger = ply->STAND;
+        if (stateManager->currentState != PLAYING)
+        {
+            break;
+        }
+
+        if (!ply->isAttackActive)
+        {
+            switch (wParam)
+            {
+                case VK_LEFT:
+                case VK_RIGHT:
+                case VK_UP:
+                case VK_DOWN:
+                    ply->actionTrigger = ply->STAND;
+                    break;
+                default:
+                    break;
+            }
+        }
         break;
 
     case WM_LBUTTONDOWN:
