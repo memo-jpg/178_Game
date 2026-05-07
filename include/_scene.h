@@ -16,6 +16,7 @@
 #include<_particles.h>
 #include<_shader.h>
 #include<_gamestate.h>
+#include<_overworld.h>
 #include<_dungeon1.h>
 #include<_dungeon2.h>
 #include<_dungeon3.h>
@@ -33,7 +34,7 @@ class _scene: public _enemyNavigation
         int winMsg(HWND	hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
         void mouseMapping(int, int);
-        void setupCollisionMap();
+        void setupOverworld();
         void setupDungeon();
         void enterDungeon1();
         void enterDungeon2();
@@ -41,12 +42,14 @@ class _scene: public _enemyNavigation
         void enterDungeon(_dungeon* dungeon);
         void exitDungeon();
         void syncPlayerToDungeon();
+        void syncPlayerToOverworld();
         bool collidesWithWall(vec3) const;
         bool fallsIntoPit(vec3) const;
         void respawnPlayer();
         void drawCollisionDebug() const;
-        vec3 overworldSpawnForDungeon(const _dungeon* dungeon) const;
         bool isEnemyPositionWalkable(const _enemies*, vec3) const;
+        bool doesRectHitPlayer(rect2D) const;
+        bool doesRectHitWall(rect2D) const;
         static float deltaTime;
         static const int MAX_OVERWORLD_ENEMIES = 20;
         //auto lastTime = chrono::steady_clock::now();
@@ -61,6 +64,7 @@ class _scene: public _enemyNavigation
         _sounds *snds = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
         _gameState *stateManager = new _gameState;
+        _dungeon *overworld = new _overworld();
         _dungeon *dungeon1 = new _dungeon1();
         _dungeon *dungeon2 = new _dungeon2();
         _dungeon *dungeon3 = new _dungeon3();
@@ -77,10 +81,6 @@ class _scene: public _enemyNavigation
         std::vector<rect2D> wallZones;
         std::vector<rect2D> pitZones;
         vec3 playerSpawn;
-        vec3 overworldSpawn;
-        rect2D dungeon1EntranceZone;
-        rect2D dungeon2EntranceZone;
-        rect2D dungeon3EntranceZone;
         bool inDungeon = false;
         bool showCollisionDebug = true;
 
@@ -96,6 +96,8 @@ class _scene: public _enemyNavigation
         void clearEnemyGroup(_enemies*[], int&);
         void spawnDungeonRoomEnemies();
         void updateAndDrawEnemyGroup(_enemies*[], int&);
+        void enterOverworldRoomForDungeon(const _dungeon*);
+        rect2D currentOverworldDungeonEntranceZone() const;
         bool collidesWithWall(rect2D) const;
         bool fallsIntoPit(rect2D) const;
 };

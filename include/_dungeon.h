@@ -25,6 +25,8 @@ class _dungeon
         std::string currentRoomName() const;
         float currentTileWorldSizeValue() const;
         std::vector<vec3> currentWalkableTileCenters() const;
+        vec3 currentWorldPositionForTile(float tileX, float tileY) const;
+        rect2D currentWorldRectForTiles(int minTileX, int maxTileX, int minTileY, int maxTileY) const;
 
     protected:
         enum TransitionSide

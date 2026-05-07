@@ -12,6 +12,8 @@ class _enemyNavigation
     public:
         virtual ~_enemyNavigation() {}
         virtual bool isEnemyPositionWalkable(const _enemies*, vec3) const = 0;
+        virtual bool doesRectHitPlayer(rect2D) const = 0;
+        virtual bool doesRectHitWall(rect2D) const = 0;
 };
 
 class _enemies:public _quad
@@ -55,11 +57,12 @@ class _enemies:public _quad
         void enmsInit(int, int, char*);
         virtual void enmsActions(float, const vec3* = NULL, const _enemyNavigation* = NULL);
         void placeEnms(vec3, float);
-        void drawEnms();
+        virtual void drawEnms();
         void setSpriteRegionPixels(int, int, int, int, int, int);
         rect2D collisionBoundsAt(vec3) const;
         rect2D collisionBounds() const;
         void cancelMove();
+        void haltMove();
         void takeDamage(int, int, FacingDirection);
         bool canBeHitByAttack(int) const;
 
@@ -72,6 +75,10 @@ class _enemies:public _quad
 
 
     protected:
+        void drawSelfWithPalette(_shader*, vec3, vec3);
+        void setIdleFrame();
+        float facingAngleDegrees() const;
+        vec2 facingVector() const;
 
     private:
         _shader* hitShader;
@@ -86,7 +93,6 @@ class _enemies:public _quad
         void ensureHitShader();
         bool isUsingHitShader() const;
         vec3 visualOffset() const;
-        void setIdleFrame();
         void setAnimationFrame(int, int);
         void beginMove(FacingDirection);
         int directionColumn() const;
