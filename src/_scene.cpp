@@ -66,6 +66,7 @@ _scene::~_scene()
     delete dungeon1;
     delete dungeon2;
     delete dungeon3;
+    delete swordTex;
 
     clearEnemyGroup(overworldEnemies, overworldEnemyCount);
     clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
@@ -96,6 +97,7 @@ GLint _scene::initGL()
     ply->scale.x = 0.25f;
     ply->scale.y = 0.25f;
     ply->scale.z = 0.25f;
+    swordTex->loadTexture("images/Sword.png");
     respawnPlayer();
     setupCollisionMap();
     setupDungeon();
@@ -452,7 +454,7 @@ void _scene::respawnPlayer()
 // DRAW COLLISION BOXES
 void _scene::drawCollisionDebug() const
 {
-    if (!showCollisionDebug && !ply->isAttackActive)
+    if (!showCollisionDebug)
     {
         return;
     }
@@ -579,14 +581,14 @@ void _scene::drawCollisionDebug() const
 
         if (showCollisionDebug)
         {
-            glColor3f(1.0f, 0.45f, 0.10f);
-            glBegin(GL_LINE_LOOP);
-                glVertex3f(attackBox.left, attackBox.bottom, debugZ);
-                glVertex3f(attackBox.right, attackBox.bottom, debugZ);
-                glVertex3f(attackBox.right, attackBox.top, debugZ);
-                glVertex3f(attackBox.left, attackBox.top, debugZ);
-            glEnd();
-        }
+        glColor3f(1.0f, 0.45f, 0.10f);
+        glBegin(GL_LINE_LOOP);
+            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
+            glVertex3f(attackBox.right, attackBox.top, debugZ);
+            glVertex3f(attackBox.left, attackBox.top, debugZ);
+        glEnd();
+    }
 
         glDisable(GL_BLEND);
     }
@@ -750,6 +752,28 @@ void _scene::drawScene()
         ply->updateQuad();
         //ply->pos.y = -1.4;
         ply->drawPlayer();
+
+        if (ply->isAttackActive)
+        {
+            const float swordZ = (float)ply->pos.z + 0.005f;
+            quad2D attackQuad = ply->attackQuad();
+
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            glEnable(GL_TEXTURE_2D);
+            swordTex->bindTexture();
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            glBegin(GL_QUADS);
+                glTexCoord2f(0.0f, 0.0f); glVertex3f(attackQuad.points[0].x, attackQuad.points[0].y, swordZ);
+                glTexCoord2f(1.0f, 0.0f); glVertex3f(attackQuad.points[1].x, attackQuad.points[1].y, swordZ);
+                glTexCoord2f(1.0f, 1.0f); glVertex3f(attackQuad.points[2].x, attackQuad.points[2].y, swordZ);
+                glTexCoord2f(0.0f, 1.0f); glVertex3f(attackQuad.points[3].x, attackQuad.points[3].y, swordZ);
+            glEnd();
+
+            glDisable(GL_BLEND);
+        }
+
         drawCollisionDebug();
 
 

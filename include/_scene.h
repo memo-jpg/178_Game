@@ -66,6 +66,8 @@ class _scene: public _enemyNavigation
         _dungeon *dungeon3 = new _dungeon3();
         _dungeon *activeDungeon = NULL;
 
+        _textureLoader* swordTex = new _textureLoader();
+
 
 
         vec3 mouse; // to keep track of the mouse location
