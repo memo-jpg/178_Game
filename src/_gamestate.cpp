@@ -23,7 +23,7 @@ void _gameState::init() {
     //load all images
     landingPage->initQuad("images/LandingPage.png");
     mainMenu->initQuad("images/MainMenu.png");
-    helpMenu->initQuad("images/HelpMenu.jpg");
+    helpMenu->initQuad("images/HelpMenu.png");
     popupMenu->initQuad("images/PopupMenu.png");
 
     btnStart->initQuad("images/StartButton.png");
