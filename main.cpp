@@ -215,7 +215,9 @@ BOOL CreateGLWindow(char* title, int width, int height, int bits, bool fullscree
 	SetForegroundWindow(hWnd);						// Slightly Higher Priority
 	SetFocus(hWnd);									// Sets Keyboard Focus To The Window
 
-	myScene->resize(width,height);                              // initial resize
+	RECT clientRect;
+	GetClientRect(hWnd, &clientRect);
+	myScene->resize(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);                              // initial resize
 	if(!myScene->initGL())                            // calling GLinit
     {
         KillGLWindow();								// Reset The Display

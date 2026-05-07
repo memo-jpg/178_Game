@@ -21,16 +21,16 @@ _gameState::~_gameState()
 }
 void _gameState::init() {
     //load all images
-    landingPage->initQuad("images/LandingPage.jpg");
-    mainMenu->initQuad("images/MainMenu.jpg");
+    landingPage->initQuad("images/LandingPage.png");
+    mainMenu->initQuad("images/MainMenu.png");
     helpMenu->initQuad("images/HelpMenu.jpg");
-    popupMenu->initQuad("images/PopupMenu.jpg");
+    popupMenu->initQuad("images/PopupMenu.png");
 
-    btnStart->initQuad("images/StartButton.jpg");
-    btnHelp->initQuad("images/HelpButton.jpg");
-    btnExitMainMenu->initQuad("images/ExitButton.jpg");
-    btnResume->initQuad("images/ResumeGame.jpg");
-    btnExitPopup->initQuad("images/ExitButton.jpg");
+    btnStart->initQuad("images/StartButton.png");
+    btnHelp->initQuad("images/HelpButton.png");
+    btnExitMainMenu->initQuad("images/ExitButton.png");
+    btnResume->initQuad("images/ResumeGame.png");
+    btnExitPopup->initQuad("images/ExitButton.png");
 
     //set variable z depth to prevent flicker
     float zLanding = -5.4f;
@@ -47,19 +47,19 @@ void _gameState::init() {
     helpMenu->scale = {1,1,1};
 
     popupMenu->pos = {0,0,zPopup};
-    popupMenu->scale = {0.6f, 0.6f, 1.0f};
+    popupMenu->scale = {0.5f, 0.5f, 1.0f};
 
     btnStart->pos = {-0.3, -0.3f, zMainMenu + 0.1f};
-    btnStart->scale = {0.1f, 0.1f, 1.0f};
+    btnStart->scale = {0.1f, 0.05f, 1.0f};
     btnHelp->pos = {0.0, -0.3f, zMainMenu + 0.1f};
-    btnHelp->scale = {0.1f, 0.1f, 1.0f};
+    btnHelp->scale = {0.1f, 0.05f, 1.0f};
     btnExitMainMenu->pos = {0.3, -0.3f, zMainMenu + 0.1f};
-    btnExitMainMenu->scale = {0.1f, 0.1f, 1.0f};
+    btnExitMainMenu->scale = {0.1f, 0.05f, 1.0f};
 
     btnResume->pos = {-0.2, 0.0f, zPopup + 0.2f};
-    btnResume->scale = {0.1f, 0.1f, 1.0f};
+    btnResume->scale = {0.1f, 0.05f, 1.0f};
     btnExitPopup->pos = {0.2, 0.0f, zPopup + 0.2f};
-    btnExitPopup->scale = {0.1f, 0.1f, 1.0f};
+    btnExitPopup->scale = {0.1f, 0.05f, 1.0f};
 }
 
 void _gameState::draw() {
@@ -160,7 +160,7 @@ void _gameState::processInput(UINT uMsg, WPARAM wParam, float mouseX, float mous
             if (isClicked(btnResume)) {
                 currentState = PLAYING;
             } else if (isClicked(btnExitPopup)) {
-                PostQuitMessage(0);
+                currentState = MAIN_MENU;
             }
         }
     } else if (uMsg == WM_RBUTTONDOWN) {
