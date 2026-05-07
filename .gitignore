@@ -2,3 +2,6 @@
 *.cbp 
 *.layout
 *.depend
+#ignore obj and bin folder
+obj/
+bin/
