@@ -5,7 +5,7 @@ _enemies::_enemies()
     //ctor
     pos.x = 0;
     pos.y = -0.4;
-    pos.z = -7;
+    pos.z = -8;
 
     rot.x = 0;
     rot.y = 0;

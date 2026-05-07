@@ -38,10 +38,6 @@ _scene::_scene()
     playerSpawn.y = -0.8f;
     playerSpawn.z = -8.0f;
 
-    overworldSpawn = playerSpawn;
-    dungeon1EntranceZone = makeRect(-0.50f, 0.50f, 0.35f, 0.95f);
-    dungeon2EntranceZone = makeRect(-2.50f, -1.50f, 0.35f, 0.95f);
-    dungeon3EntranceZone = makeRect(1.50f, 2.50f, 0.35f, 0.95f);
     overworldEnemyCount = 0;
     dungeonRoomEnemyCount = 0;
 
@@ -64,6 +60,7 @@ _scene::~_scene()
     delete ply;
     delete snds;
     delete hit;
+    delete overworld;
     delete dungeon1;
     delete dungeon2;
     delete dungeon3;
@@ -89,16 +86,13 @@ GLint _scene::initGL()
     //Mymodel->initModel("images/crate.png");
     //myVBO->modelInit("images/crate.png");
 
-    myPrlx->initPrlx("images/prlx2.jpg");
-
     //myQuad->initQuad("images/crate.png");
 
     ply->plyInit(4, 4, "images/BlueLink.png");
     ply->scale.x = 0.25f;
     ply->scale.y = 0.25f;
     ply->scale.z = 0.25f;
-    respawnPlayer();
-    setupCollisionMap();
+    setupOverworld();
     setupDungeon();
     initOverworldEnemies();
     stateManager->init();   //init game state
@@ -122,33 +116,22 @@ void _scene::resize(GLint width, GLint height)
     glMatrixMode(GL_MODELVIEW);     // initiate model & view matrix
     glLoadIdentity();
 
-    dim.x = GetSystemMetrics(SM_CXSCREEN);
-    dim.y = GetSystemMetrics(SM_CYSCREEN);
-
+    dim.x = (float)width;
+    dim.y = (float)height;
 }
 
 float _scene::deltaTime = 0;        // initializing static variable
 
-void _scene::setupCollisionMap()
+void _scene::setupOverworld()
 {
     wallZones.clear();
     pitZones.clear();
-
-    // World bounds for the current room
-    wallZones.push_back(makeRect(-4.25f, -3.60f, -2.20f, 2.40f));   // left
-    wallZones.push_back(makeRect(2.60f, 3.25f, -2.20f, 2.40f));     // right
-    wallZones.push_back(makeRect(-4.25f, 3.25f, 1.70f, 2.40f));     // top
-    wallZones.push_back(makeRect(-4.25f, 3.25f, -2.20f, -1.95f));   // down
-
-    // Sample solid objects
-    // Adjust for final map art
-    wallZones.push_back(makeRect(-4.90f, -3.55f, -1.55f, -0.70f));
-    wallZones.push_back(makeRect(-3.15f, -1.85f, -1.55f, -0.70f));
-    wallZones.push_back(makeRect(2.80f, 4.10f, -1.55f, -0.70f));
-    wallZones.push_back(makeRect(6.10f, 7.05f, -1.55f, -0.70f));
-
-    // Pits/hazards
-    pitZones.push_back(makeRect(-0.75f, 0.75f, -1.60f, -1.10f));
+    if (overworld != NULL && overworld->load())
+    {
+        overworld->enterDefaultRoom();
+        syncPlayerToOverworld();
+        respawnPlayer();
+    }
 }
 
 void _scene::setupDungeon()
@@ -162,16 +145,49 @@ void _scene::initOverworldEnemies()
 {
     clearEnemyGroup(overworldEnemies, overworldEnemyCount);
 
-    if (overworldEnemyCount >= MAX_OVERWORLD_ENEMIES)
+    if (overworld == NULL || !overworld->isLoaded() || overworld->currentRoomName() != "hub_room")
     {
         return;
     }
 
+    std::vector<vec3> candidates = overworld->currentWalkableTileCenters();
+    if (candidates.size() < 2)
+    {
+        return;
+    }
+
+    const float tileSize = overworld->currentTileWorldSizeValue();
+    const vec3 spawnPoint = overworld->currentSpawnWorld();
+    std::vector<vec3> filteredCandidates;
+
+    for (size_t i = 0; i < candidates.size(); i++)
+    {
+        const vec3& candidate = candidates[i];
+        const float deltaX = (float)candidate.x - (float)spawnPoint.x;
+        const float deltaY = (float)candidate.y - (float)spawnPoint.y;
+        const float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        const float minimumDistance = tileSize * 4.0f;
+
+        if (distanceSquared < minimumDistance * minimumDistance)
+        {
+            continue;
+        }
+
+        filteredCandidates.push_back(candidate);
+    }
+
+    if (filteredCandidates.size() >= 2)
+    {
+        candidates = filteredCandidates;
+    }
+
     _enemyOck* testEnemy = new _enemyOck();
     testEnemy->initOck();
-
-    overworldEnemies[overworldEnemyCount] = testEnemy;
-    overworldEnemyCount++;
+    testEnemy->tileStepDistance = tileSize;
+    testEnemy->pos = candidates[candidates.size() / 3];
+    testEnemy->moveStartPos = testEnemy->pos;
+    testEnemy->moveTargetPos = testEnemy->pos;
+    overworldEnemies[overworldEnemyCount++] = testEnemy;
 
     if (overworldEnemyCount >= MAX_OVERWORLD_ENEMIES)
     {
@@ -180,9 +196,11 @@ void _scene::initOverworldEnemies()
 
     _enemyMoblin* testMoblin = new _enemyMoblin();
     testMoblin->initMoblin();
-
-    overworldEnemies[overworldEnemyCount] = testMoblin;
-    overworldEnemyCount++;
+    testMoblin->tileStepDistance = tileSize;
+    testMoblin->pos = candidates[(candidates.size() * 2) / 3];
+    testMoblin->moveStartPos = testMoblin->pos;
+    testMoblin->moveTargetPos = testMoblin->pos;
+    overworldEnemies[overworldEnemyCount++] = testMoblin;
 }
 
 void _scene::clearEnemyGroup(_enemies* enemies[], int& enemyCount)
@@ -311,6 +329,19 @@ void _scene::syncPlayerToDungeon()
     ply->scale.z = scale;
 }
 
+void _scene::syncPlayerToOverworld()
+{
+    if (inDungeon || overworld == NULL || !overworld->isLoaded())
+    {
+        return;
+    }
+
+    const float scale = overworld->currentPlayerScale();
+    ply->scale.x = scale;
+    ply->scale.y = scale;
+    ply->scale.z = scale;
+}
+
 void _scene::enterDungeon1()
 {
     enterDungeon(dungeon1);
@@ -346,28 +377,25 @@ void _scene::enterDungeon(_dungeon* dungeon)
     spawnDungeonRoomEnemies();
 }
 
-vec3 _scene::overworldSpawnForDungeon(const _dungeon* dungeon) const
+void _scene::enterOverworldRoomForDungeon(const _dungeon* dungeon)
 {
-    vec3 spawn = overworldSpawn;
-    spawn.z = -8.0f;
+    if (overworld == NULL || !overworld->isLoaded())
+    {
+        return;
+    }
 
     if (dungeon == dungeon1)
     {
-        spawn.x = 0.0f;
-        spawn.y = 0.10f;
+        overworld->enterRoom("left_room", 4.5f, 4.5f);
     }
     else if (dungeon == dungeon2)
     {
-        spawn.x = -2.0f;
-        spawn.y = 0.10f;
+        overworld->enterRoom("center_room", 4.5f, 4.5f);
     }
     else if (dungeon == dungeon3)
     {
-        spawn.x = 2.0f;
-        spawn.y = 0.10f;
+        overworld->enterRoom("right_room", 4.5f, 4.5f);
     }
-
-    return spawn;
 }
 
 bool _scene::isEnemyPositionWalkable(const _enemies* enemy, vec3 position) const
@@ -391,6 +419,33 @@ bool _scene::doesRectHitWall(rect2D rect) const
     return collidesWithWall(rect);
 }
 
+rect2D _scene::currentOverworldDungeonEntranceZone() const
+{
+    if (overworld == NULL || !overworld->isLoaded())
+    {
+        return makeRect(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    const std::string roomName = overworld->currentRoomName();
+
+    if (roomName == "left_room")
+    {
+        return overworld->currentWorldRectForTiles(5, 6, 4, 5);
+    }
+
+    if (roomName == "center_room")
+    {
+        return overworld->currentWorldRectForTiles(4, 5, 4, 5);
+    }
+
+    if (roomName == "right_room")
+    {
+        return overworld->currentWorldRectForTiles(3, 4, 4, 5);
+    }
+
+    return makeRect(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
 void _scene::exitDungeon()
 {
     if (activeDungeon == NULL)
@@ -398,15 +453,15 @@ void _scene::exitDungeon()
         return;
     }
 
-    vec3 spawn = overworldSpawnForDungeon(activeDungeon);
+    _dungeon* exitingDungeon = activeDungeon;
     inDungeon = false;
     activeDungeon = NULL;
-    ply->pos = spawn;
+    enterOverworldRoomForDungeon(exitingDungeon);
+    syncPlayerToOverworld();
+    ply->pos = overworld != NULL ? overworld->currentSpawnWorld() : playerSpawn;
     ply->finishAttack();
-    ply->scale.x = 0.25f;
-    ply->scale.y = 0.25f;
-    ply->scale.z = 0.25f;
     clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+    initOverworldEnemies();
 }
 
 bool _scene::collidesWithWall(vec3 position) const
@@ -422,15 +477,7 @@ bool _scene::collidesWithWall(rect2D playerBox) const
         return activeDungeon != NULL ? activeDungeon->collidesWithWall(playerBox) : false;
     }
 
-    for (size_t i = 0; i < wallZones.size(); i++)
-    {
-        if (hit->isRectCollide(playerBox, wallZones[i]))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return overworld != NULL ? overworld->collidesWithWall(playerBox) : false;
 }
 
 bool _scene::fallsIntoPit(vec3 position) const
@@ -441,32 +488,23 @@ bool _scene::fallsIntoPit(vec3 position) const
 
 bool _scene::fallsIntoPit(rect2D playerBox) const
 {
-    if (inDungeon)
-    {
-        return false;
-    }
-
-    for (size_t i = 0; i < pitZones.size(); i++)
-    {
-        if (hit->isRectCollide(playerBox, pitZones[i]))
-        {
-            return true;
-        }
-    }
-
     return false;
 }
 
 void _scene::respawnPlayer()
 {
+    if (!inDungeon && overworld != NULL && overworld->isLoaded())
+    {
+        playerSpawn = overworld->currentSpawnWorld();
+        syncPlayerToOverworld();
+    }
+
     ply->pos = playerSpawn;
     ply->finishAttack();
 
     if (!inDungeon)
     {
-        ply->scale.x = 0.25f;
-        ply->scale.y = 0.25f;
-        ply->scale.z = 0.25f;
+        syncPlayerToOverworld();
     }
 }
 
@@ -495,53 +533,22 @@ void _scene::drawCollisionDebug() const
         }
         else
         {
-            for (size_t i = 0; i < wallZones.size(); i++)
+            if (overworld != NULL)
             {
-                const rect2D& zone = wallZones[i];
-                glColor3f(1.0f, 0.2f, 0.2f);
-                glBegin(GL_LINE_LOOP);
-                    glVertex3f(zone.left, zone.bottom, debugZ);
-                    glVertex3f(zone.right, zone.bottom, debugZ);
-                    glVertex3f(zone.right, zone.top, debugZ);
-                    glVertex3f(zone.left, zone.top, debugZ);
-                glEnd();
+                overworld->drawCollisionDebug();
+
+                rect2D entranceZone = currentOverworldDungeonEntranceZone();
+                if (entranceZone.left != entranceZone.right || entranceZone.top != entranceZone.bottom)
+                {
+                    glColor3f(1.0f, 0.8f, 0.2f);
+                    glBegin(GL_LINE_LOOP);
+                        glVertex3f(entranceZone.left, entranceZone.bottom, debugZ);
+                        glVertex3f(entranceZone.right, entranceZone.bottom, debugZ);
+                        glVertex3f(entranceZone.right, entranceZone.top, debugZ);
+                        glVertex3f(entranceZone.left, entranceZone.top, debugZ);
+                    glEnd();
+                }
             }
-
-            for (size_t i = 0; i < pitZones.size(); i++)
-            {
-                const rect2D& zone = pitZones[i];
-                glColor3f(1.0f, 0.9f, 0.1f);
-                glBegin(GL_LINE_LOOP);
-                    glVertex3f(zone.left, zone.bottom, debugZ);
-                    glVertex3f(zone.right, zone.bottom, debugZ);
-                    glVertex3f(zone.right, zone.top, debugZ);
-                    glVertex3f(zone.left, zone.top, debugZ);
-                glEnd();
-            }
-
-            glColor3f(0.2f, 0.8f, 1.0f);
-            glBegin(GL_LINE_LOOP);
-                glVertex3f(dungeon1EntranceZone.left, dungeon1EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon1EntranceZone.right, dungeon1EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon1EntranceZone.right, dungeon1EntranceZone.top, debugZ);
-                glVertex3f(dungeon1EntranceZone.left, dungeon1EntranceZone.top, debugZ);
-            glEnd();
-
-            glColor3f(0.3f, 1.0f, 0.4f);
-            glBegin(GL_LINE_LOOP);
-                glVertex3f(dungeon2EntranceZone.left, dungeon2EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon2EntranceZone.right, dungeon2EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon2EntranceZone.right, dungeon2EntranceZone.top, debugZ);
-                glVertex3f(dungeon2EntranceZone.left, dungeon2EntranceZone.top, debugZ);
-            glEnd();
-
-            glColor3f(1.0f, 0.6f, 0.2f);
-            glBegin(GL_LINE_LOOP);
-                glVertex3f(dungeon3EntranceZone.left, dungeon3EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon3EntranceZone.right, dungeon3EntranceZone.bottom, debugZ);
-                glVertex3f(dungeon3EntranceZone.right, dungeon3EntranceZone.top, debugZ);
-                glVertex3f(dungeon3EntranceZone.left, dungeon3EntranceZone.top, debugZ);
-            glEnd();
         }
 
         rect2D playerBox = ply->collisionBounds();
@@ -695,10 +702,10 @@ void _scene::drawScene()
         //Game objects now go here
         if (!inDungeon)
         {
-            glPushMatrix();
-            glScalef(13.3, 13.3, 1);
-            myPrlx->drawBackground(dim.x, dim.y);
-            glPopMatrix();
+            if (overworld != NULL)
+            {
+                overworld->drawCurrentRoom();
+            }
         }
         else
         {
@@ -736,9 +743,18 @@ void _scene::drawScene()
                 ply->pos = previousPlayerPos;
             }
         }
-        else if (collidesWithWall(ply->pos))
+        else
         {
-            ply->pos = previousPlayerPos;
+            rect2D playerBox = ply->collisionBounds();
+            if (overworld != NULL && overworld->updateRoomTransition(ply->pos, playerBox))
+            {
+                syncPlayerToOverworld();
+                initOverworldEnemies();
+            }
+            else if (collidesWithWall(ply->pos))
+            {
+                ply->pos = previousPlayerPos;
+            }
         }
 
         if (!inDungeon && fallsIntoPit(ply->pos))
@@ -746,17 +762,27 @@ void _scene::drawScene()
             respawnPlayer();
         }
 
-        if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon1EntranceZone))
+        if (!inDungeon && overworld != NULL)
         {
-            enterDungeon1();
-        }
-        else if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon2EntranceZone))
-        {
-            enterDungeon2();
-        }
-        else if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon3EntranceZone))
-        {
-            enterDungeon3();
+            const std::string roomName = overworld->currentRoomName();
+            const rect2D entranceZone = currentOverworldDungeonEntranceZone();
+
+            if ((entranceZone.left != entranceZone.right || entranceZone.top != entranceZone.bottom) &&
+                hit->isRectCollide(ply->collisionBounds(), entranceZone))
+            {
+                if (roomName == "left_room")
+                {
+                    enterDungeon1();
+                }
+                else if (roomName == "center_room")
+                {
+                    enterDungeon2();
+                }
+                else if (roomName == "right_room")
+                {
+                    enterDungeon3();
+                }
+            }
         }
 
         if (!inDungeon)

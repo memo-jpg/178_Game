@@ -694,6 +694,23 @@ std::vector<vec3> _dungeon::currentWalkableTileCenters() const
     return positions;
 }
 
+vec3 _dungeon::currentWorldPositionForTile(float tileX, float tileY) const
+{
+    return worldPositionForTile(tileX, tileY);
+}
+
+rect2D _dungeon::currentWorldRectForTiles(int minTileX, int maxTileX, int minTileY, int maxTileY) const
+{
+    rect2D rect;
+    const float tileWorldSize = currentTileWorldSize();
+
+    rect.left = roomLeft() + ((float)minTileX * tileWorldSize);
+    rect.right = roomLeft() + ((float)(maxTileX + 1) * tileWorldSize);
+    rect.top = roomTop() - ((float)minTileY * tileWorldSize);
+    rect.bottom = roomTop() - ((float)(maxTileY + 1) * tileWorldSize);
+    return rect;
+}
+
 bool _dungeon::consumePendingOverworldExit()
 {
     const bool hadPendingExit = pendingOverworldExit;
