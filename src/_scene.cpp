@@ -705,8 +705,8 @@ void _scene::drawScene()
     }
 
     if(ply->actionTrigger == ply->LEFTWALK || ply->actionTrigger == ply->RIGHTWALK || ply->actionTrigger == ply->WALKDOWN || ply->actionTrigger == ply->WALKUP){
-        if (!sfx->sndEng->isCurrentlyPlaying("sounds/8 bit walk cycle.mp3")) {
-            sfx->playSounds("sounds/8 bit walk cycle.mp3");
+        if (!sfx->sndEng->isCurrentlyPlaying("sounds/walk.mp3")) {
+            sfx->playSounds("sounds/walk.mp3");
         }
     }
 
