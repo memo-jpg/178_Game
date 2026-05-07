@@ -2,6 +2,5 @@
 *.cbp 
 *.layout
 *.depend
-#ignore obj and bin folder
-obj/
+#ignore just bin folder
 bin/
