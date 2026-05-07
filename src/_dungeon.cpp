@@ -6,6 +6,21 @@ namespace
     {
         return tileCoord >= (float)minTile - 0.35f && tileCoord <= (float)maxTile + 0.35f;
     }
+
+    float clampf(float value, float minValue, float maxValue)
+    {
+        if (value < minValue)
+        {
+            return minValue;
+        }
+
+        if (value > maxValue)
+        {
+            return maxValue;
+        }
+
+        return value;
+    }
 }
 
 _dungeon::_dungeon()
@@ -16,6 +31,7 @@ _dungeon::_dungeon()
     minTileWorldSize = 0.18f;
     maxTileWorldSize = 0.42f;
     loaded = false;
+    pendingOverworldExit = false;
 
     spawnWorld.x = 0.0;
     spawnWorld.y = 0.0;
@@ -36,6 +52,7 @@ bool _dungeon::loadDungeon(const char* mapImagePath, const char* collisionMapPat
     loaded = false;
     rooms.clear();
     currentRoomId.clear();
+    pendingOverworldExit = false;
 
     roomQuad.initQuad((char*)mapImagePath);
 
@@ -44,7 +61,7 @@ bool _dungeon::loadDungeon(const char* mapImagePath, const char* collisionMapPat
         return false;
     }
 
-    buildDungeon1Transitions();
+    buildTransitions();
     loaded = !rooms.empty();
     return loaded;
 }
@@ -148,36 +165,33 @@ bool _dungeon::parseCollisionMap(const char* collisionMapPath)
     return !rooms.empty();
 }
 
-void _dungeon::buildDungeon1Transitions()
+void _dungeon::clearTransitions()
 {
     for (size_t i = 0; i < rooms.size(); i++)
     {
         rooms[i].transitions.clear();
+        rooms[i].exits.clear();
+    }
+}
+
+void _dungeon::addOverworldExit(const std::string& roomId,
+                                int minTileX,
+                                int maxTileX,
+                                int minTileY,
+                                int maxTileY)
+{
+    DungeonRoom* room = findRoom(roomId);
+    if (!room)
+    {
+        return;
     }
 
-    addTransition("top_room", SOUTH, 4, 5, "hub_center_left", 4.0f, 3.0f);
-
-    addTransition("hub_left", EAST, 5, 6, "hub_center_left", 1.0f, 5.0f);
-
-    addTransition("hub_center_left", NORTH, 4, 5, "top_room", 4.0f, 6.0f);
-    addTransition("hub_center_left", EAST, 5, 6, "hub_center_right", 1.0f, 5.0f);
-    addTransition("hub_center_left", WEST, 5, 6, "hub_left", 8.0f, 5.0f);
-    addTransition("hub_center_left", SOUTH, 4, 5, "lower_center_room", 4.0f, 3.0f);
-
-    addTransition("hub_center_right", EAST, 5, 6, "hub_right", 1.0f, 5.0f);
-    addTransition("hub_center_right", WEST, 5, 6, "hub_center_left", 8.0f, 5.0f);
-    addTransition("hub_center_right", SOUTH, 4, 5, "lower_center_room", 17.0f, 3.0f);
-
-    addTransition("hub_right", WEST, 5, 6, "hub_center_right", 8.0f, 5.0f);
-    addTransition("hub_right", SOUTH, 4, 5, "lower_right_room", 5.0f, 3.0f);
-
-    addTransition("lower_center_room", NORTH, 4, 5, "hub_center_left", 4.0f, 8.0f);
-    addTransition("lower_center_room", NORTH, 17, 18, "hub_center_right", 4.0f, 8.0f);
-
-    addTransition("lower_right_room", NORTH, 4, 5, "hub_right", 5.0f, 8.0f);
-    addTransition("lower_right_room", SOUTH, 0, 9, "bottom_room", 9.0f, 3.0f);
-
-    addTransition("bottom_room", NORTH, 9, 10, "lower_right_room", 4.0f, 14.0f);
+    RoomExit exit;
+    exit.minTileX = minTileX;
+    exit.maxTileX = maxTileX;
+    exit.minTileY = minTileY;
+    exit.maxTileY = maxTileY;
+    room->exits.push_back(exit);
 }
 
 void _dungeon::addTransition(const std::string& roomId,
@@ -185,8 +199,8 @@ void _dungeon::addTransition(const std::string& roomId,
                              int minTile,
                              int maxTile,
                              const std::string& targetRoomId,
-                             float targetTileX,
-                             float targetTileY)
+                             int targetMinTile,
+                             int targetMaxTile)
 {
     DungeonRoom* room = findRoom(roomId);
     if (!room)
@@ -199,8 +213,8 @@ void _dungeon::addTransition(const std::string& roomId,
     transition.minTile = minTile;
     transition.maxTile = maxTile;
     transition.targetRoomId = targetRoomId;
-    transition.targetTileX = targetTileX;
-    transition.targetTileY = targetTileY;
+    transition.targetMinTile = targetMinTile;
+    transition.targetMaxTile = targetMaxTile;
     room->transitions.push_back(transition);
 }
 
@@ -239,6 +253,7 @@ bool _dungeon::enterRoom(const std::string& roomId, float spawnTileX, float spaw
     }
 
     currentRoomId = roomId;
+    pendingOverworldExit = false;
     syncCurrentRoomTexture();
 
     if (spawnTileX < 0.0f)
@@ -253,6 +268,12 @@ bool _dungeon::enterRoom(const std::string& roomId, float spawnTileX, float spaw
 
     spawnWorld = worldPositionForTile(spawnTileX, spawnTileY);
     return true;
+}
+
+bool _dungeon::enterDefaultRoom()
+{
+    const char* roomId = defaultRoomId();
+    return roomId && roomId[0] != '\0' && enterRoom(roomId);
 }
 
 void _dungeon::syncCurrentRoomTexture()
@@ -391,12 +412,70 @@ bool _dungeon::updateRoomTransition(vec3& playerPosition, const rect2D& playerBo
             continue;
         }
 
-        if (!enterRoom(transition.targetRoomId, transition.targetTileX, transition.targetTileY))
+        const float transitionCoord = (transition.side == NORTH || transition.side == SOUTH) ? tileX : tileY;
+        const float sourceSpan = (float)(transition.maxTile - transition.minTile);
+        float normalized = 0.5f;
+
+        if (sourceSpan > 0.0f)
+        {
+            normalized = (transitionCoord - (float)transition.minTile) / sourceSpan;
+        }
+
+        normalized = clampf(normalized, 0.0f, 1.0f);
+
+        const float targetSpan = (float)(transition.targetMaxTile - transition.targetMinTile);
+        const float targetCoord = (float)transition.targetMinTile + (targetSpan * normalized);
+        const DungeonRoom* targetRoom = findRoom(transition.targetRoomId);
+        if (!targetRoom)
+        {
+            return false;
+        }
+
+        float spawnTileX = targetCoord;
+        float spawnTileY = 0.0f;
+
+        switch (transition.side)
+        {
+            case NORTH:
+                spawnTileY = (float)targetRoom->heightTiles - 2.0f;
+                break;
+
+            case SOUTH:
+                spawnTileY = 1.0f;
+                break;
+
+            case EAST:
+                spawnTileX = 1.0f;
+                spawnTileY = targetCoord;
+                break;
+
+            case WEST:
+                spawnTileX = (float)targetRoom->widthTiles - 2.0f;
+                spawnTileY = targetCoord;
+                break;
+        }
+
+        if (!enterRoom(transition.targetRoomId, spawnTileX, spawnTileY))
         {
             return false;
         }
 
         playerPosition = spawnWorld;
+        return true;
+    }
+
+    for (size_t i = 0; i < room->exits.size(); i++)
+    {
+        const RoomExit& exit = room->exits[i];
+        const bool xMatch = tileX >= (float)exit.minTileX - 0.35f && tileX <= (float)exit.maxTileX + 0.35f;
+        const bool yMatch = tileY >= (float)exit.minTileY - 0.35f && tileY <= (float)exit.maxTileY + 0.35f;
+
+        if (!xMatch || !yMatch)
+        {
+            continue;
+        }
+
+        pendingOverworldExit = true;
         return true;
     }
 
@@ -546,6 +625,23 @@ void _dungeon::drawCollisionDebug() const
             }
         }
     }
+
+    glColor3f(1.0f, 0.9f, 0.2f);
+    for (size_t i = 0; i < room->exits.size(); i++)
+    {
+        const RoomExit& exit = room->exits[i];
+        const float left = roomLeft() + (float)exit.minTileX * tileWorldSize;
+        const float right = roomLeft() + (float)(exit.maxTileX + 1) * tileWorldSize;
+        const float top = roomTop() - (float)exit.minTileY * tileWorldSize;
+        const float bottom = roomTop() - (float)(exit.maxTileY + 1) * tileWorldSize;
+
+        glBegin(GL_LINE_LOOP);
+            glVertex3f(left, bottom, debugZ);
+            glVertex3f(right, bottom, debugZ);
+            glVertex3f(right, top, debugZ);
+            glVertex3f(left, top, debugZ);
+        glEnd();
+    }
 }
 
 bool _dungeon::isLoaded() const
@@ -561,4 +657,46 @@ vec3 _dungeon::currentSpawnWorld() const
 float _dungeon::currentPlayerScale() const
 {
     return currentTileWorldSize() * 0.67f;
+}
+
+std::string _dungeon::currentRoomName() const
+{
+    return currentRoomId;
+}
+
+float _dungeon::currentTileWorldSizeValue() const
+{
+    return currentTileWorldSize();
+}
+
+std::vector<vec3> _dungeon::currentWalkableTileCenters() const
+{
+    std::vector<vec3> positions;
+    const DungeonRoom* room = findRoom(currentRoomId);
+    if (!room)
+    {
+        return positions;
+    }
+
+    for (int row = 0; row < room->heightTiles; row++)
+    {
+        for (int col = 0; col < room->widthTiles; col++)
+        {
+            if (room->collisionRows[row][col] != '.')
+            {
+                continue;
+            }
+
+            positions.push_back(worldPositionForTile((float)col, (float)row));
+        }
+    }
+
+    return positions;
+}
+
+bool _dungeon::consumePendingOverworldExit()
+{
+    const bool hadPendingExit = pendingOverworldExit;
+    pendingOverworldExit = false;
+    return hadPendingExit;
 }

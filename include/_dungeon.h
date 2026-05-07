@@ -10,18 +10,23 @@ class _dungeon
         _dungeon();
         virtual ~_dungeon();
 
-        bool loadDungeon(const char* mapImagePath, const char* collisionMapPath);
+        virtual bool load() = 0;
         bool enterRoom(const std::string& roomId, float spawnTileX = -1.0f, float spawnTileY = -1.0f);
+        bool enterDefaultRoom();
         bool updateRoomTransition(vec3& playerPosition, const rect2D& playerBox);
         bool collidesWithWall(const rect2D& playerBox) const;
         void drawCurrentRoom();
         void drawCollisionDebug() const;
+        bool consumePendingOverworldExit();
 
         bool isLoaded() const;
         vec3 currentSpawnWorld() const;
         float currentPlayerScale() const;
+        std::string currentRoomName() const;
+        float currentTileWorldSizeValue() const;
+        std::vector<vec3> currentWalkableTileCenters() const;
 
-    private:
+    protected:
         enum TransitionSide
         {
             NORTH,
@@ -36,8 +41,16 @@ class _dungeon
             int minTile;
             int maxTile;
             std::string targetRoomId;
-            float targetTileX;
-            float targetTileY;
+            int targetMinTile;
+            int targetMaxTile;
+        };
+
+        struct RoomExit
+        {
+            int minTileX;
+            int maxTileX;
+            int minTileY;
+            int maxTileY;
         };
 
         struct DungeonRoom
@@ -51,11 +64,18 @@ class _dungeon
             float defaultSpawnY;
             std::vector<std::string> collisionRows;
             std::vector<RoomTransition> transitions;
+            std::vector<RoomExit> exits;
         };
 
-        bool parseCollisionMap(const char* collisionMapPath);
-        void buildDungeon1Transitions();
-        void syncCurrentRoomTexture();
+        bool loadDungeon(const char* mapImagePath, const char* collisionMapPath);
+        virtual void buildTransitions() = 0;
+        virtual const char* defaultRoomId() const = 0;
+        void clearTransitions();
+        void addOverworldExit(const std::string& roomId,
+                              int minTileX,
+                              int maxTileX,
+                              int minTileY,
+                              int maxTileY);
         const DungeonRoom* findRoom(const std::string& roomId) const;
         DungeonRoom* findRoom(const std::string& roomId);
         void addTransition(const std::string& roomId,
@@ -63,8 +83,12 @@ class _dungeon
                            int minTile,
                            int maxTile,
                            const std::string& targetRoomId,
-                           float targetTileX,
-                           float targetTileY);
+                           int targetMinTile,
+                           int targetMaxTile);
+
+    private:
+        bool parseCollisionMap(const char* collisionMapPath);
+        void syncCurrentRoomTexture();
         float currentTileWorldSize() const;
         float roomWorldWidth() const;
         float roomWorldHeight() const;
@@ -86,6 +110,7 @@ class _dungeon
         float minTileWorldSize;
         float maxTileWorldSize;
         bool loaded;
+        bool pendingOverworldExit;
 };
 
 #endif // _DUNGEON_H

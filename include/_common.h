@@ -47,5 +47,11 @@ typedef struct{
 
 }rect2D;
 
+typedef struct{
+
+    vec2 points[4];
+
+}quad2D;
+
 
 #endif // _COMMON_H

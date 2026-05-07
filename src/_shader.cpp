@@ -3,6 +3,9 @@
 _shader::_shader()
 {
     //ctor
+    vs = 0;
+    fs = 0;
+    program = 0;
 }
 
 _shader::~_shader()
@@ -26,7 +29,6 @@ void _shader::loadFile(char* fileName, string& str)
     }
 
     str += '\n';
-    cout << str << endl;        // only for debug
     in.close();
 }
 
@@ -71,9 +73,31 @@ void _shader::initShader(char* vFileName, char* fFileName)
 
 void _shader::cleanUp()
 {
-    glDetachShader(program, vs);
-    glDetachShader(program, fs);
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    glDeleteShader(program);
+    if (program != 0 && vs != 0)
+    {
+        glDetachShader(program, vs);
+    }
+
+    if (program != 0 && fs != 0)
+    {
+        glDetachShader(program, fs);
+    }
+
+    if (vs != 0)
+    {
+        glDeleteShader(vs);
+        vs = 0;
+    }
+
+    if (fs != 0)
+    {
+        glDeleteShader(fs);
+        fs = 0;
+    }
+
+    if (program != 0)
+    {
+        glDeleteProgram(program);
+        program = 0;
+    }
 }
