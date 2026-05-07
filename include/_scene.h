@@ -47,6 +47,8 @@ class _scene: public _enemyNavigation
         void drawCollisionDebug() const;
         vec3 overworldSpawnForDungeon(const _dungeon* dungeon) const;
         bool isEnemyPositionWalkable(const _enemies*, vec3) const;
+        bool doesRectHitPlayer(rect2D) const;
+        bool doesRectHitWall(rect2D) const;
         static float deltaTime;
         static const int MAX_OVERWORLD_ENEMIES = 20;
         //auto lastTime = chrono::steady_clock::now();

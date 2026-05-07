@@ -91,6 +91,54 @@ bool _enemies::isUsingHitShader() const
     return damageFlashTimer > 0.0f && hitShaderInitialized && hitShader != NULL;
 }
 
+float _enemies::facingAngleDegrees() const
+{
+    switch (facingDirection)
+    {
+        case FACE_LEFT:
+            return 180.0f;
+
+        case FACE_RIGHT:
+            return 0.0f;
+
+        case FACE_UP:
+            return 90.0f;
+
+        case FACE_DOWN:
+        default:
+            return -90.0f;
+    }
+}
+
+vec2 _enemies::facingVector() const
+{
+    vec2 direction;
+    direction.x = 0.0f;
+    direction.y = 0.0f;
+
+    switch (facingDirection)
+    {
+        case FACE_LEFT:
+            direction.x = -1.0f;
+            break;
+
+        case FACE_RIGHT:
+            direction.x = 1.0f;
+            break;
+
+        case FACE_UP:
+            direction.y = 1.0f;
+            break;
+
+        case FACE_DOWN:
+        default:
+            direction.y = -1.0f;
+            break;
+    }
+
+    return direction;
+}
+
 void _enemies::setAnimationFrame(int rowIndex, int frameIndex)
 {
     const float frameWidth = (regionXMax - regionXMin) / (float)xFrames;
@@ -240,6 +288,18 @@ void _enemies::cancelMove()
     actionTrigger = STAND;
 }
 
+void _enemies::haltMove()
+{
+    moveStartPos = pos;
+    moveTargetPos = pos;
+    moveProgress = 0.0f;
+    timer = 0.0f;
+    isMoving = false;
+    isKnockbackActive = false;
+    startedMoveThisFrame = false;
+    actionTrigger = STAND;
+}
+
 bool _enemies::canBeHitByAttack(int attackId) const
 {
     return isEnmsLive && attackId >= 0 && lastHitAttackId != attackId;
@@ -331,35 +391,23 @@ void _enemies::placeEnms(vec3 Epos, float deltaT)
     pos.z = Epos.z;
 }
 
-void _enemies::drawEnms()
+void _enemies::drawSelfWithPalette(_shader* paletteShader, vec3 shadowColor, vec3 highlightColor)
 {
     updateQuad();
     const vec3 basePos = pos;
     const vec3 offset = visualOffset();
+    const bool usePaletteShader = paletteShader != NULL;
 
-    if (isUsingHitShader())
+    if (usePaletteShader)
     {
-        glUseProgram(hitShader->program);
-
-        const float flashProgress = damageFlashDuration > 0.0f ?
-            1.0f - (damageFlashTimer / damageFlashDuration) : 1.0f;
-        const bool useRedPalette = flashProgress < 0.5f;
-        const GLint textureLoc = glGetUniformLocation(hitShader->program, "u_texture");
-        const GLint shadowLoc = glGetUniformLocation(hitShader->program, "u_shadowColor");
-        const GLint highlightLoc = glGetUniformLocation(hitShader->program, "u_highlightColor");
+        glUseProgram(paletteShader->program);
+        const GLint textureLoc = glGetUniformLocation(paletteShader->program, "u_texture");
+        const GLint shadowLoc = glGetUniformLocation(paletteShader->program, "u_shadowColor");
+        const GLint highlightLoc = glGetUniformLocation(paletteShader->program, "u_highlightColor");
 
         glUniform1i(textureLoc, 0);
-
-        if (useRedPalette)
-        {
-            glUniform3f(shadowLoc, 0.28f, 0.02f, 0.02f);
-            glUniform3f(highlightLoc, 1.0f, 0.38f, 0.32f);
-        }
-        else
-        {
-            glUniform3f(shadowLoc, 0.03f, 0.06f, 0.24f);
-            glUniform3f(highlightLoc, 0.42f, 0.68f, 1.0f);
-        }
+        glUniform3f(shadowLoc, (float)shadowColor.x, (float)shadowColor.y, (float)shadowColor.z);
+        glUniform3f(highlightLoc, (float)highlightColor.x, (float)highlightColor.y, (float)highlightColor.z);
     }
 
     pos.x = basePos.x + offset.x;
@@ -370,8 +418,49 @@ void _enemies::drawEnms()
 
     pos = basePos;
 
-    if (isUsingHitShader())
+    if (usePaletteShader)
     {
         glUseProgram(0);
     }
+}
+
+void _enemies::drawEnms()
+{
+    if (isUsingHitShader())
+    {
+        const float flashProgress = damageFlashDuration > 0.0f ?
+            1.0f - (damageFlashTimer / damageFlashDuration) : 1.0f;
+        vec3 shadowColor;
+        vec3 highlightColor;
+
+        if (flashProgress < 0.5f)
+        {
+            shadowColor.x = 0.28f;
+            shadowColor.y = 0.02f;
+            shadowColor.z = 0.02f;
+            highlightColor.x = 1.0f;
+            highlightColor.y = 0.38f;
+            highlightColor.z = 0.32f;
+        }
+        else
+        {
+            shadowColor.x = 0.03f;
+            shadowColor.y = 0.06f;
+            shadowColor.z = 0.24f;
+            highlightColor.x = 0.42f;
+            highlightColor.y = 0.68f;
+            highlightColor.z = 1.0f;
+        }
+
+        drawSelfWithPalette(hitShader, shadowColor, highlightColor);
+        return;
+    }
+
+    vec3 shadowColor;
+    vec3 highlightColor;
+    shadowColor.x = 0.0;
+    shadowColor.y = 0.0;
+    shadowColor.z = 0.0;
+    highlightColor = shadowColor;
+    drawSelfWithPalette(NULL, shadowColor, highlightColor);
 }

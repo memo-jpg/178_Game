@@ -1,4 +1,5 @@
 #include "_scene.h"
+#include "_enemyCently.h"
 #include "_enemyMoblin.h"
 #include "_enemyOck.h"
 
@@ -207,14 +208,16 @@ void _scene::spawnDungeonRoomEnemies()
     const std::string roomName = activeDungeon->currentRoomName();
     const bool isDungeon1Room = activeDungeon == dungeon1;
     const bool isDungeon2Room = activeDungeon == dungeon2;
+    const bool isDungeon3Room = activeDungeon == dungeon3;
 
-    if (!isDungeon1Room && !isDungeon2Room)
+    if (!isDungeon1Room && !isDungeon2Room && !isDungeon3Room)
     {
         return;
     }
 
     if ((isDungeon1Room && (roomName == "top_room" || roomName == "bottom_room")) ||
-        (isDungeon2Room && (roomName == "left_room" || roomName == "boss_room")))
+        (isDungeon2Room && (roomName == "left_room" || roomName == "boss_room")) ||
+        (isDungeon3Room && (roomName == "left_room" || roomName == "boss_room")))
     {
         return;
     }
@@ -252,7 +255,8 @@ void _scene::spawnDungeonRoomEnemies()
 
     std::shuffle(candidates.begin(), candidates.end(), dungeonEnemyRng());
 
-    std::uniform_int_distribution<int> spawnCountDistribution(1, 4);
+    const int maxSpawnCount = isDungeon3Room ? 3 : 4;
+    std::uniform_int_distribution<int> spawnCountDistribution(1, maxSpawnCount);
     const int desiredSpawnCount = spawnCountDistribution(dungeonEnemyRng());
     const int spawnCount = std::min(desiredSpawnCount, (int)candidates.size());
 
@@ -272,12 +276,19 @@ void _scene::spawnDungeonRoomEnemies()
             moblin->initMoblin();
             roomEnemy = moblin;
         }
+        else if (isDungeon3Room)
+        {
+            _enemyCently* cently = new _enemyCently();
+            cently->initCently();
+            roomEnemy = cently;
+        }
 
         if (roomEnemy == NULL)
         {
             continue;
         }
 
+        roomEnemy->tileStepDistance = tileSize;
         roomEnemy->pos = candidates[i];
         roomEnemy->moveStartPos = roomEnemy->pos;
         roomEnemy->moveTargetPos = roomEnemy->pos;
@@ -368,6 +379,16 @@ bool _scene::isEnemyPositionWalkable(const _enemies* enemy, vec3 position) const
 
     const rect2D enemyBox = enemy->collisionBoundsAt(position);
     return !collidesWithWall(enemyBox) && !fallsIntoPit(enemyBox);
+}
+
+bool _scene::doesRectHitPlayer(rect2D rect) const
+{
+    return hit != NULL && ply != NULL && hit->isRectCollide(rect, ply->collisionBounds());
+}
+
+bool _scene::doesRectHitWall(rect2D rect) const
+{
+    return collidesWithWall(rect);
 }
 
 void _scene::exitDungeon()
@@ -742,7 +763,7 @@ void _scene::drawScene()
         {
             updateAndDrawEnemyGroup(overworldEnemies, overworldEnemyCount);
         }
-        else if (activeDungeon == dungeon1 || activeDungeon == dungeon2)
+        else if (activeDungeon == dungeon1 || activeDungeon == dungeon2 || activeDungeon == dungeon3)
         {
             updateAndDrawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
         }

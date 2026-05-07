@@ -14,12 +14,35 @@ _bullets::_bullets()
     scale.x = 0.2;
     scale.y = 0.2;
     scale.z = 1.0;
+
+    speed = 0.0f;
+    flashTimer = 0.0f;
+    collisionScale = 0.55f;
+    flashEnabled = false;
+    direction.x = 0.0;
+    direction.y = 0.0;
+    direction.z = 0.0;
+    flashShader = new _shader();
+    flashShaderInitialized = false;
 }
 
 _bullets::~_bullets()
 {
     //dtor
+    delete flashShader;
 }
+
+void _bullets::ensureFlashShader()
+{
+    if (flashShaderInitialized || flashShader == NULL)
+    {
+        return;
+    }
+
+    flashShader->initShader("shaders/enemy_hit.vs", "shaders/enemy_hit.fs");
+    flashShaderInitialized = true;
+}
+
 void _bullets::initBlt(int x, int y, char *fileName)
 {
     initQuad(fileName);
@@ -35,6 +58,75 @@ void _bullets::initBlt(int x, int y, char *fileName)
 void _bullets::update(vec3)
 {
     // TO DO | depends on use of bullets
+}
+
+void _bullets::launch(vec3 startPos, vec3 directionVector, float travelSpeed, float rotationOffset)
+{
+    const float magnitude = sqrt(
+        (float)(directionVector.x * directionVector.x) +
+        (float)(directionVector.y * directionVector.y) +
+        (float)(directionVector.z * directionVector.z)
+    );
+
+    if (magnitude <= 0.0001f)
+    {
+        deactivate();
+        return;
+    }
+
+    pos = startPos;
+    dest = startPos;
+    direction.x = directionVector.x / magnitude;
+    direction.y = directionVector.y / magnitude;
+    direction.z = directionVector.z / magnitude;
+    speed = travelSpeed;
+    flashTimer = 0.0f;
+    timer = 0.0f;
+    t = 0.0f;
+    rot.z = (atan2((float)direction.y, (float)direction.x) * 180.0f / PI) + rotationOffset;
+    actionTrigger = ACTIVE;
+    isLive = true;
+}
+
+void _bullets::updateTravel(float deltaT)
+{
+    if (!isActive())
+    {
+        return;
+    }
+
+    flashTimer += deltaT;
+    pos.x += direction.x * speed * deltaT;
+    pos.y += direction.y * speed * deltaT;
+    pos.z += direction.z * speed * deltaT;
+}
+
+void _bullets::deactivate()
+{
+    actionTrigger = IDLE;
+    isLive = false;
+    timer = 0.0f;
+    t = 0.0f;
+    speed = 0.0f;
+    flashTimer = 0.0f;
+}
+
+rect2D _bullets::collisionBounds() const
+{
+    const float halfWidth = (float)scale.x * collisionScale;
+    const float halfHeight = (float)scale.y * collisionScale;
+
+    rect2D bounds;
+    bounds.left = (float)pos.x - halfWidth;
+    bounds.right = (float)pos.x + halfWidth;
+    bounds.bottom = (float)pos.y - halfHeight;
+    bounds.top = (float)pos.y + halfHeight;
+    return bounds;
+}
+
+bool _bullets::isActive() const
+{
+    return isLive && actionTrigger == ACTIVE;
 }
 
 void _bullets::shoot(vec3 spos, vec3 dpos, float deltaT)
@@ -103,6 +195,39 @@ void _bullets::drawBlt()
 {
     if(isLive){
         updateQuad();
+
+        if (flashEnabled)
+        {
+            ensureFlashShader();
+        }
+
+        if (flashEnabled && flashShaderInitialized && flashShader != NULL)
+        {
+            const bool useRedPalette = ((int)floor(flashTimer * 18.0f) % 2) == 0;
+            const GLint textureLoc = glGetUniformLocation(flashShader->program, "u_texture");
+            const GLint shadowLoc = glGetUniformLocation(flashShader->program, "u_shadowColor");
+            const GLint highlightLoc = glGetUniformLocation(flashShader->program, "u_highlightColor");
+
+            glUseProgram(flashShader->program);
+            glUniform1i(textureLoc, 0);
+
+            if (useRedPalette)
+            {
+                glUniform3f(shadowLoc, 0.45f, 0.02f, 0.02f);
+                glUniform3f(highlightLoc, 1.0f, 0.92f, 0.92f);
+            }
+            else
+            {
+                glUniform3f(shadowLoc, 0.68f, 0.68f, 0.68f);
+                glUniform3f(highlightLoc, 1.0f, 1.0f, 1.0f);
+            }
+        }
+
         drawQuad();
+
+        if (flashEnabled && flashShaderInitialized && flashShader != NULL)
+        {
+            glUseProgram(0);
+        }
     }
 }
