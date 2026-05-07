@@ -62,6 +62,7 @@ class _scene: public _enemyNavigation
         _quad *myQuad = new _quad();
         _player *ply = new _player();
         _sounds *snds = new _sounds();
+        _sounds *sfx = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
         _gameState *stateManager = new _gameState;
         _dungeon *overworld = new _overworld();

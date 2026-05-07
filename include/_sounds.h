@@ -12,12 +12,16 @@ class _sounds
         _sounds();
         virtual ~_sounds();
 
+        ISoundEngine *sndEng = createIrrKlangDevice();
+        ISound* snd;
+        ISoundSource* wav;
+
         void playMusic(char*);
         void playSounds(char*);
         void pauseSound(char*);
         void initSound();
 
-        ISoundEngine *sndEng = createIrrKlangDevice();
+        //ISoundEngine *sndEng = createIrrKlangDevice();
 
     protected:
 
