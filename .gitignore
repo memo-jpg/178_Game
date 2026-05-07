@@ -2,6 +2,8 @@
 *.cbp 
 *.layout
 *.depend
+*.exe
+*.o
 #ignore obj and bin folder
 obj/
 bin/
