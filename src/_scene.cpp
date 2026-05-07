@@ -1,4 +1,5 @@
 #include "_scene.h"
+#include "_boss1.h"
 #include "_enemyCently.h"
 #include "_enemyMoblin.h"
 #include "_enemyOck.h"
@@ -59,12 +60,14 @@ _scene::~_scene()
     delete myQuad;
     delete ply;
     delete snds;
+    delete sfx;
     delete hit;
     delete overworld;
     delete dungeon1;
     delete dungeon2;
     delete dungeon3;
     delete swordTex;
+    delete dungeonExitTriggerSprite;
 
     clearEnemyGroup(overworldEnemies, overworldEnemyCount);
     clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
@@ -95,6 +98,7 @@ GLint _scene::initGL()
     ply->scale.z = 0.25f;
     setupOverworld();
     swordTex->loadTexture("images/Sword.png");
+    dungeonExitTriggerSprite->initQuad("images/exit.png");
     setupDungeon();
     initOverworldEnemies();
     stateManager->init();   //init game state
@@ -230,16 +234,50 @@ void _scene::spawnDungeonRoomEnemies()
     const bool isDungeon1Room = activeDungeon == dungeon1;
     const bool isDungeon2Room = activeDungeon == dungeon2;
     const bool isDungeon3Room = activeDungeon == dungeon3;
+    const bool isDungeon1BossRoom = isDungeon1Room && roomName == "bottom_room";
 
     if (!isDungeon1Room && !isDungeon2Room && !isDungeon3Room)
     {
         return;
     }
 
-    if ((isDungeon1Room && (roomName == "top_room" || roomName == "bottom_room")) ||
+    if ((isDungeon1Room && roomName == "top_room") ||
         (isDungeon2Room && (roomName == "left_room" || roomName == "boss_room")) ||
         (isDungeon3Room && (roomName == "left_room" || roomName == "boss_room")))
     {
+        return;
+    }
+
+    if (isDungeon1BossRoom)
+    {
+        const float tileSize = activeDungeon->currentTileWorldSizeValue();
+        const vec3 bossSpawn = activeDungeon->currentWorldPositionForTile(9.5f, 9.5f);
+        const vec3 octSpawns[3] =
+        {
+            activeDungeon->currentWorldPositionForTile(5.0f, 7.0f),
+            activeDungeon->currentWorldPositionForTile(14.0f, 7.0f),
+            activeDungeon->currentWorldPositionForTile(9.5f, 14.0f)
+        };
+
+        _boss1* boss = new _boss1();
+        boss->initBoss1();
+        boss->tileStepDistance = tileSize;
+        boss->pos = bossSpawn;
+        boss->moveStartPos = boss->pos;
+        boss->moveTargetPos = boss->pos;
+        dungeonRoomEnemies[dungeonRoomEnemyCount++] = boss;
+
+        for (int i = 0; i < 3 && dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES; i++)
+        {
+            _enemyOck* ock = new _enemyOck();
+            ock->initOck();
+            ock->tileStepDistance = tileSize;
+            ock->pos = octSpawns[i];
+            ock->moveStartPos = ock->pos;
+            ock->moveTargetPos = ock->pos;
+            dungeonRoomEnemies[dungeonRoomEnemyCount++] = ock;
+        }
+
         return;
     }
 
@@ -401,6 +439,127 @@ void _scene::enterOverworldRoomForDungeon(const _dungeon* dungeon)
     }
 }
 
+bool _scene::isDungeon1BossRoomActive() const
+{
+    return inDungeon &&
+           activeDungeon != NULL &&
+           activeDungeon == dungeon1 &&
+           activeDungeon->currentRoomName() == "bottom_room";
+}
+
+bool _scene::isDungeon1BossRoomCleared() const
+{
+    if (!isDungeon1BossRoomActive() || dungeonRoomEnemyCount <= 0)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < dungeonRoomEnemyCount; i++)
+    {
+        if (dungeonRoomEnemies[i] != NULL && dungeonRoomEnemies[i]->isEnmsLive)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+rect2D _scene::dungeon1BossReturnTriggerBounds() const
+{
+    if (!isDungeon1BossRoomActive())
+    {
+        return makeRect(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    return activeDungeon->currentWorldRectForTiles(9, 10, 10, 11);
+}
+
+void _scene::drawDungeon1BossReturnTrigger() const
+{
+    if (!isDungeon1BossRoomCleared())
+    {
+        return;
+    }
+
+    const double elapsedSeconds = chrono::duration<double>(
+        chrono::steady_clock::now().time_since_epoch()
+    ).count();
+    const float pulse = 0.72f + 0.28f * (float)((sin(elapsedSeconds * 4.0) + 1.0) * 0.5);
+    drawExitTriggerSprite(dungeon1BossReturnTriggerBounds(), pulse, 0.22f + (0.18f * pulse));
+}
+
+void _scene::drawExitTriggerSprite(rect2D triggerBounds, float pulse, float fillAlpha) const
+{
+    const float triggerWidth = triggerBounds.right - triggerBounds.left;
+    const float triggerHeight = triggerBounds.top - triggerBounds.bottom;
+    const float centerX = (triggerBounds.left + triggerBounds.right) * 0.5f;
+    const float centerY = (triggerBounds.bottom + triggerBounds.top) * 0.5f;
+    const float debugZ = (float)ply->pos.z + 0.012f;
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_TEXTURE_2D);
+    glDisable(GL_LIGHTING);
+
+    glColor4f(0.15f, 0.95f, 0.85f, fillAlpha);
+    glBegin(GL_QUADS);
+        glVertex3f(triggerBounds.left, triggerBounds.bottom, debugZ);
+        glVertex3f(triggerBounds.right, triggerBounds.bottom, debugZ);
+        glVertex3f(triggerBounds.right, triggerBounds.top, debugZ);
+        glVertex3f(triggerBounds.left, triggerBounds.top, debugZ);
+    glEnd();
+
+    if (dungeonExitTriggerSprite != NULL)
+    {
+        dungeonExitTriggerSprite->pos.x = centerX;
+        dungeonExitTriggerSprite->pos.y = centerY;
+        dungeonExitTriggerSprite->pos.z = debugZ + 0.001f;
+        dungeonExitTriggerSprite->scale.x = (triggerWidth * 0.5f) * (0.95f + 0.08f * pulse);
+        dungeonExitTriggerSprite->scale.y = (triggerHeight * 0.5f) * (0.95f + 0.08f * pulse);
+        dungeonExitTriggerSprite->scale.z = 1.0f;
+        glColor4f(1.0f, 1.0f, 1.0f, 0.9f);
+        dungeonExitTriggerSprite->drawQuad();
+    }
+
+    glLineWidth(2.5f);
+    glColor4f(0.95f, 1.0f, 0.65f, 0.75f + (0.2f * pulse));
+    glBegin(GL_LINE_LOOP);
+        glVertex3f(triggerBounds.left, triggerBounds.bottom, debugZ);
+        glVertex3f(triggerBounds.right, triggerBounds.bottom, debugZ);
+        glVertex3f(triggerBounds.right, triggerBounds.top, debugZ);
+        glVertex3f(triggerBounds.left, triggerBounds.top, debugZ);
+    glEnd();
+
+    glDisable(GL_BLEND);
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_LIGHTING);
+}
+
+void _scene::drawActiveDungeonReturnTriggers() const
+{
+    if (!inDungeon || activeDungeon == NULL)
+    {
+        return;
+    }
+
+    const std::vector<rect2D> exitZones = activeDungeon->currentExitZones();
+    if (exitZones.empty())
+    {
+        return;
+    }
+
+    const double elapsedSeconds = chrono::duration<double>(
+        chrono::steady_clock::now().time_since_epoch()
+    ).count();
+    const float pulse = 0.72f + 0.28f * (float)((sin(elapsedSeconds * 3.4) + 1.0) * 0.5);
+
+    for (size_t i = 0; i < exitZones.size(); i++)
+    {
+        drawExitTriggerSprite(exitZones[i], pulse, 0.18f + (0.12f * pulse));
+    }
+}
+
 bool _scene::isEnemyPositionWalkable(const _enemies* enemy, vec3 position) const
 {
     if (enemy == NULL)
@@ -525,62 +684,71 @@ void _scene::drawCollisionDebug() const
     glDisable(GL_LIGHTING);
     glLineWidth(2.0f);
 
-    if (showCollisionDebug)
+    if (inDungeon)
     {
-        if (inDungeon)
+        if (activeDungeon != NULL)
         {
-            if (activeDungeon != NULL)
+            activeDungeon->drawCollisionDebug();
+
+            if (isDungeon1BossRoomCleared())
             {
-                activeDungeon->drawCollisionDebug();
-            }
-        }
-        else
-        {
-            if (overworld != NULL)
-            {
-                overworld->drawCollisionDebug();
-
-                rect2D entranceZone = currentOverworldDungeonEntranceZone();
-                if (entranceZone.left != entranceZone.right || entranceZone.top != entranceZone.bottom)
-                {
-                    glColor3f(1.0f, 0.8f, 0.2f);
-                    glBegin(GL_LINE_LOOP);
-                        glVertex3f(entranceZone.left, entranceZone.bottom, debugZ);
-                        glVertex3f(entranceZone.right, entranceZone.bottom, debugZ);
-                        glVertex3f(entranceZone.right, entranceZone.top, debugZ);
-                        glVertex3f(entranceZone.left, entranceZone.top, debugZ);
-                    glEnd();
-                }
-            }
-        }
-
-        rect2D playerBox = ply->collisionBounds();
-        glColor3f(0.2f, 1.0f, 0.2f);
-        glBegin(GL_LINE_LOOP);
-            glVertex3f(playerBox.left, playerBox.bottom, debugZ);
-            glVertex3f(playerBox.right, playerBox.bottom, debugZ);
-            glVertex3f(playerBox.right, playerBox.top, debugZ);
-            glVertex3f(playerBox.left, playerBox.top, debugZ);
-        glEnd();
-
-        if (!inDungeon)
-        {
-            for (int i = 0; i < overworldEnemyCount; i++)
-            {
-                if (overworldEnemies[i] == NULL || !overworldEnemies[i]->isEnmsLive)
-                {
-                    continue;
-                }
-
-                rect2D enemyBox = overworldEnemies[i]->collisionBounds();
-                glColor3f(1.0f, 0.15f, 0.85f);
+                const rect2D triggerBounds = dungeon1BossReturnTriggerBounds();
+                glColor3f(0.95f, 1.0f, 0.65f);
                 glBegin(GL_LINE_LOOP);
-                    glVertex3f(enemyBox.left, enemyBox.bottom, debugZ);
-                    glVertex3f(enemyBox.right, enemyBox.bottom, debugZ);
-                    glVertex3f(enemyBox.right, enemyBox.top, debugZ);
-                    glVertex3f(enemyBox.left, enemyBox.top, debugZ);
+                    glVertex3f(triggerBounds.left, triggerBounds.bottom, debugZ);
+                    glVertex3f(triggerBounds.right, triggerBounds.bottom, debugZ);
+                    glVertex3f(triggerBounds.right, triggerBounds.top, debugZ);
+                    glVertex3f(triggerBounds.left, triggerBounds.top, debugZ);
                 glEnd();
             }
+        }
+    }
+    else
+    {
+        if (overworld != NULL)
+        {
+            overworld->drawCollisionDebug();
+
+            rect2D entranceZone = currentOverworldDungeonEntranceZone();
+            if (entranceZone.left != entranceZone.right || entranceZone.top != entranceZone.bottom)
+            {
+                glColor3f(1.0f, 0.8f, 0.2f);
+                glBegin(GL_LINE_LOOP);
+                    glVertex3f(entranceZone.left, entranceZone.bottom, debugZ);
+                    glVertex3f(entranceZone.right, entranceZone.bottom, debugZ);
+                    glVertex3f(entranceZone.right, entranceZone.top, debugZ);
+                    glVertex3f(entranceZone.left, entranceZone.top, debugZ);
+                glEnd();
+            }
+        }
+    }
+
+    rect2D playerBox = ply->collisionBounds();
+    glColor3f(0.2f, 1.0f, 0.2f);
+    glBegin(GL_LINE_LOOP);
+        glVertex3f(playerBox.left, playerBox.bottom, debugZ);
+        glVertex3f(playerBox.right, playerBox.bottom, debugZ);
+        glVertex3f(playerBox.right, playerBox.top, debugZ);
+        glVertex3f(playerBox.left, playerBox.top, debugZ);
+    glEnd();
+
+    if (!inDungeon)
+    {
+        for (int i = 0; i < overworldEnemyCount; i++)
+        {
+            if (overworldEnemies[i] == NULL || !overworldEnemies[i]->isEnmsLive)
+            {
+                continue;
+            }
+
+            rect2D enemyBox = overworldEnemies[i]->collisionBounds();
+            glColor3f(1.0f, 0.15f, 0.85f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(enemyBox.left, enemyBox.bottom, debugZ);
+                glVertex3f(enemyBox.right, enemyBox.bottom, debugZ);
+                glVertex3f(enemyBox.right, enemyBox.top, debugZ);
+                glVertex3f(enemyBox.left, enemyBox.top, debugZ);
+            glEnd();
         }
     }
 
@@ -610,14 +778,14 @@ void _scene::drawCollisionDebug() const
 
         if (showCollisionDebug)
         {
-        glColor3f(1.0f, 0.45f, 0.10f);
-        glBegin(GL_LINE_LOOP);
-            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.top, debugZ);
-            glVertex3f(attackBox.left, attackBox.top, debugZ);
-        glEnd();
-    }
+            glColor3f(1.0f, 0.45f, 0.10f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(attackBox.left, attackBox.bottom, debugZ);
+                glVertex3f(attackBox.right, attackBox.bottom, debugZ);
+                glVertex3f(attackBox.right, attackBox.top, debugZ);
+                glVertex3f(attackBox.left, attackBox.top, debugZ);
+            glEnd();
+        }
 
         glDisable(GL_BLEND);
     }
@@ -808,6 +976,18 @@ void _scene::drawScene()
         else if (activeDungeon == dungeon1 || activeDungeon == dungeon2 || activeDungeon == dungeon3)
         {
             updateAndDrawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+
+            if (isDungeon1BossRoomCleared() &&
+                hit->isRectCollide(ply->collisionBounds(), dungeon1BossReturnTriggerBounds()))
+            {
+                exitDungeon();
+            }
+        }
+
+        if (inDungeon)
+        {
+            drawActiveDungeonReturnTriggers();
+            drawDungeon1BossReturnTrigger();
         }
 
         ply->updateQuad();

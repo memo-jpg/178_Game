@@ -72,6 +72,7 @@ class _scene: public _enemyNavigation
         _dungeon *activeDungeon = NULL;
 
         _textureLoader* swordTex = new _textureLoader();
+        _quad *dungeonExitTriggerSprite = new _quad();
 
 
 
@@ -98,6 +99,12 @@ class _scene: public _enemyNavigation
         void spawnDungeonRoomEnemies();
         void updateAndDrawEnemyGroup(_enemies*[], int&);
         void enterOverworldRoomForDungeon(const _dungeon*);
+        void drawExitTriggerSprite(rect2D, float, float) const;
+        void drawActiveDungeonReturnTriggers() const;
+        bool isDungeon1BossRoomActive() const;
+        bool isDungeon1BossRoomCleared() const;
+        rect2D dungeon1BossReturnTriggerBounds() const;
+        void drawDungeon1BossReturnTrigger() const;
         rect2D currentOverworldDungeonEntranceZone() const;
         bool collidesWithWall(rect2D) const;
         bool fallsIntoPit(rect2D) const;

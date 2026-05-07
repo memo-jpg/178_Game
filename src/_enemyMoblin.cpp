@@ -44,7 +44,7 @@ _enemyMoblin::_enemyMoblin()
     health = 3;
     actionTrigger = STAND;
     moveInterval = 2.0f;
-    moveDuration = 1.0f;
+    moveDuration = 0.45f;
 }
 
 _enemyMoblin::~_enemyMoblin()

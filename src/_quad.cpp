@@ -30,6 +30,8 @@ void _quad::drawQuad()
 {
     glPushMatrix();
     glColor3f(1.0, 1.0, 1.0);               // set base color
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     myTex->bindTexture();
 

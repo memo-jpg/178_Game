@@ -694,6 +694,24 @@ std::vector<vec3> _dungeon::currentWalkableTileCenters() const
     return positions;
 }
 
+std::vector<rect2D> _dungeon::currentExitZones() const
+{
+    std::vector<rect2D> exitZones;
+    const DungeonRoom* room = findRoom(currentRoomId);
+    if (!room)
+    {
+        return exitZones;
+    }
+
+    for (size_t i = 0; i < room->exits.size(); i++)
+    {
+        const RoomExit& exit = room->exits[i];
+        exitZones.push_back(currentWorldRectForTiles(exit.minTileX, exit.maxTileX, exit.minTileY, exit.maxTileY));
+    }
+
+    return exitZones;
+}
+
 vec3 _dungeon::currentWorldPositionForTile(float tileX, float tileY) const
 {
     return worldPositionForTile(tileX, tileY);
