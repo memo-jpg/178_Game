@@ -388,15 +388,15 @@ void _scene::enterOverworldRoomForDungeon(const _dungeon* dungeon)
 
     if (dungeon == dungeon1)
     {
-        overworld->enterRoom("left_room", 4.5f, 4.5f);
+        overworld->enterRoom("left_room", 5.5f, 7.0f);
     }
     else if (dungeon == dungeon2)
     {
-        overworld->enterRoom("center_room", 4.5f, 4.5f);
+        overworld->enterRoom("center_room", 4.5f, 7.0f);
     }
     else if (dungeon == dungeon3)
     {
-        overworld->enterRoom("right_room", 4.5f, 4.5f);
+        overworld->enterRoom("right_room", 3.5f, 7.0f);
     }
 }
 
