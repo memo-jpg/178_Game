@@ -696,12 +696,18 @@ void _scene::drawScene()
     //Mymodel->drawModel();
     //myVBO->drawmodel();
 
+    static int lastAttackId = 0;
     if(ply->actionTrigger == ply->ATTACK){
-        sfx->playSounds("sounds/attack.mp3");
+        if (ply->currentAttackId() != lastAttackId) {
+            sfx->playSounds("sounds/attack.mp3");
+            lastAttackId = ply->currentAttackId();
+        }
     }
 
     if(ply->actionTrigger == ply->LEFTWALK || ply->actionTrigger == ply->RIGHTWALK || ply->actionTrigger == ply->WALKDOWN || ply->actionTrigger == ply->WALKUP){
-        sfx->playSounds("sounds/8 bit walk cycle.mp3");
+        if (!sfx->sndEng->isCurrentlyPlaying("sounds/8 bit walk cycle.mp3")) {
+            sfx->playSounds("sounds/8 bit walk cycle.mp3");
+        }
     }
 
     if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU) {
