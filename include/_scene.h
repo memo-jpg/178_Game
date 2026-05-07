@@ -16,9 +16,11 @@
 #include<_particles.h>
 #include<_shader.h>
 #include<_gamestate.h>
-#include<_dungeon.h>
+#include<_dungeon1.h>
+#include<_dungeon2.h>
+#include<_dungeon3.h>
 
-class _scene
+class _scene: public _enemyNavigation
 {
     public:
         _scene();
@@ -34,12 +36,19 @@ class _scene
         void setupCollisionMap();
         void setupDungeon();
         void enterDungeon1();
+        void enterDungeon2();
+        void enterDungeon3();
+        void enterDungeon(_dungeon* dungeon);
+        void exitDungeon();
         void syncPlayerToDungeon();
         bool collidesWithWall(vec3) const;
         bool fallsIntoPit(vec3) const;
         void respawnPlayer();
         void drawCollisionDebug() const;
+        vec3 overworldSpawnForDungeon(const _dungeon* dungeon) const;
+        bool isEnemyPositionWalkable(const _enemies*, vec3) const;
         static float deltaTime;
+        static const int MAX_OVERWORLD_ENEMIES = 20;
         //auto lastTime = chrono::steady_clock::now();
 
         _lightSettings *myLight = new _lightSettings();
@@ -50,10 +59,12 @@ class _scene
         _quad *myQuad = new _quad();
         _player *ply = new _player();
         _sounds *snds = new _sounds();
-        _sounds *sfx = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
         _gameState *stateManager = new _gameState;
-        _dungeon *dungeon1 = new _dungeon();
+        _dungeon *dungeon1 = new _dungeon1();
+        _dungeon *dungeon2 = new _dungeon2();
+        _dungeon *dungeon3 = new _dungeon3();
+        _dungeon *activeDungeon = NULL;
 
 
 
@@ -65,13 +76,26 @@ class _scene
         std::vector<rect2D> pitZones;
         vec3 playerSpawn;
         vec3 overworldSpawn;
-        rect2D dungeonEntranceZone;
+        rect2D dungeon1EntranceZone;
+        rect2D dungeon2EntranceZone;
+        rect2D dungeon3EntranceZone;
         bool inDungeon = false;
         bool showCollisionDebug = true;
 
     protected:
 
     private:
+        _enemies* overworldEnemies[MAX_OVERWORLD_ENEMIES];
+        int overworldEnemyCount;
+        _enemies* dungeonRoomEnemies[MAX_OVERWORLD_ENEMIES];
+        int dungeonRoomEnemyCount;
+
+        void initOverworldEnemies();
+        void clearEnemyGroup(_enemies*[], int&);
+        void spawnDungeonRoomEnemies();
+        void updateAndDrawEnemyGroup(_enemies*[], int&);
+        bool collidesWithWall(rect2D) const;
+        bool fallsIntoPit(rect2D) const;
 };
 
 #endif // _SCENE_H

@@ -3,15 +3,22 @@
 _inputs::_inputs()
 {
     //ctor
+
     isRotate = false;
     isTranslate = false;
+    nextDirectionOrder = 0;
+
+    for (int i = 0; i < DIR_COUNT; i++)
+    {
+        directionHeld[i] = false;
+        directionOrder[i] = 0;
+    }
 }
 
 _inputs::~_inputs()
 {
     //dtor
 }
-
 void _inputs::keyPressed(_model *mdl)
 {
     //cout<< wParam << endl;
@@ -38,6 +45,94 @@ void _inputs::keyUp()
 {
     switch(wParam){
         default: break;
+    }
+}
+
+int _inputs::directionIndexForKey(WPARAM key) const
+{
+    switch (key)
+    {
+        case VK_LEFT:
+            return DIR_LEFT;
+        case VK_RIGHT:
+            return DIR_RIGHT;
+        case VK_UP:
+            return DIR_UP;
+        case VK_DOWN:
+            return DIR_DOWN;
+        default:
+            return -1;
+    }
+}
+
+void _inputs::handleKeyDown(WPARAM key)
+{
+    wParam = key;
+
+    const int directionIndex = directionIndexForKey(key);
+    if (directionIndex >= 0)
+    {
+        if (!directionHeld[directionIndex])
+        {
+            directionOrder[directionIndex] = ++nextDirectionOrder;
+        }
+
+        directionHeld[directionIndex] = true;
+    }
+}
+
+void _inputs::handleKeyUp(WPARAM key)
+{
+    wParam = key;
+
+    const int directionIndex = directionIndexForKey(key);
+    if (directionIndex >= 0)
+    {
+        directionHeld[directionIndex] = false;
+        directionOrder[directionIndex] = 0;
+    }
+}
+
+void _inputs::syncPlayerMovement(_player* qD)
+{
+    if (qD == NULL || qD->isAttackActive)
+    {
+        return;
+    }
+
+    int activeDirection = -1;
+    unsigned long latestOrder = 0;
+
+    for (int i = 0; i < DIR_COUNT; i++)
+    {
+        if (directionHeld[i] && directionOrder[i] >= latestOrder)
+        {
+            latestOrder = directionOrder[i];
+            activeDirection = i;
+        }
+    }
+
+    switch (activeDirection)
+    {
+        case DIR_LEFT:
+            qD->facingDirection = _player::FACE_LEFT;
+            qD->actionTrigger = qD->LEFTWALK;
+            break;
+        case DIR_RIGHT:
+            qD->facingDirection = _player::FACE_RIGHT;
+            qD->actionTrigger = qD->RIGHTWALK;
+            break;
+        case DIR_UP:
+            qD->facingDirection = _player::FACE_UP;
+            qD->actionTrigger = qD->WALKUP;
+            break;
+        case DIR_DOWN:
+            qD->facingDirection = _player::FACE_DOWN;
+            qD->actionTrigger = qD->WALKDOWN;
+            break;
+        default:
+            qD->actionTrigger = qD->STAND;
+            break;
     }
 }
 
@@ -133,49 +228,16 @@ void _inputs::mouseWheel(_modelVBO* mdlv, double delta)
 
 void _inputs::keyPressed(_player* qD)
 {
+    if (wParam == VK_SPACE)
+    {
+        qD->startAttack();
+        return;
+    }
+
     if (qD->isAttackActive)
     {
         return;
     }
 
-    switch(wParam){
-    case VK_LEFT:
-        //qD->xMax -= 0.9/(float)qD->xFrames;
-        //qD->xMin -= 0.9/(float)qD->xFrames;
-
-        qD->facingDirection = _player::FACE_LEFT;
-        qD->actionTrigger = qD->LEFTWALK;
-        break;
-
-    case VK_RIGHT:
-        //qD->xMax += 0.9/(float)qD->xFrames;
-        //qD->xMin += 0.9/(float)qD->xFrames;
-
-        qD->facingDirection = _player::FACE_RIGHT;
-        qD->actionTrigger = qD->RIGHTWALK;
-        break;
-
-    case VK_UP:
-        qD->facingDirection = _player::FACE_UP;
-        qD->actionTrigger = qD->WALKUP;
-        break;
-
-    case VK_DOWN:
-        qD->facingDirection = _player::FACE_DOWN;
-        qD->actionTrigger = qD->WALKDOWN;
-        break;
-
-    case VK_SPACE: //space bar
-        qD->actionTrigger = qD->ATTACK;
-        qD->startAttack();
-        break;
-
-    case VK_SHIFT: //shift key
-        qD->actionTrigger = qD->BLOCK;
-        break;
-
-    default:
-        qD->actionTrigger = qD->STAND;
-
-    }
+    syncPlayerMovement(qD);
 }

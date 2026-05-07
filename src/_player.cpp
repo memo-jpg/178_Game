@@ -17,10 +17,10 @@ _player::_player()
     collisionHeightScale = 0.576f;
     collisionOffsetY = 0.0f;
     currentFrame = 0;
+    attackId = 0;
     actionTrigger = STAND;
     facingDirection = FACE_DOWN;
     isAttackActive = false;
-
 }
 
 _player::~_player()
@@ -123,6 +123,7 @@ void _player::startAttack()
     }
 
     isAttackActive = true;
+    attackId++;
     timer = 0.0f;
     attackTimer = 0.0f;
     actionTrigger = ATTACK;
@@ -176,6 +177,11 @@ float _player::getFacingAngleDegrees() const
     }
 }
 
+int _player::currentAttackId() const
+{
+    return attackId;
+}
+
 rect2D _player::collisionBoundsAt(vec3 position) const
 {
     const float halfWidth = (float)scale.x * collisionWidthScale;
@@ -195,24 +201,59 @@ rect2D _player::collisionBounds() const
     return collisionBoundsAt(pos);
 }
 
+quad2D _player::attackQuad() const
+{
+    const float sweepDegrees = 135.0f;
+    const float startOffsetDegrees = 45.0f;
+    const float angleDegrees = (getFacingAngleDegrees() + startOffsetDegrees) - (sweepDegrees * getAttackProgress());
+    const float angleRadians = angleDegrees * PI / 180.0f;
+    const float swordHalfWidth = (float)scale.x * 0.20f;
+    const float swordLength = (float)scale.y * 1.95f;
+    const float hiltOffset = (float)scale.y * 0.35f;
+
+    const float originX = (float)pos.x;
+    const float originY = (float)pos.y + collisionOffsetY;
+
+    const float forwardX = cos(angleRadians);
+    const float forwardY = sin(angleRadians);
+    const float sideX = -forwardY;
+    const float sideY = forwardX;
+
+    const float nearX = originX + forwardX * hiltOffset;
+    const float nearY = originY + forwardY * hiltOffset;
+    const float farX = originX + forwardX * (hiltOffset + swordLength);
+    const float farY = originY + forwardY * (hiltOffset + swordLength);
+
+    quad2D quad;
+    quad.points[0].x = nearX - sideX * swordHalfWidth;
+    quad.points[0].y = nearY - sideY * swordHalfWidth;
+    quad.points[1].x = nearX + sideX * swordHalfWidth;
+    quad.points[1].y = nearY + sideY * swordHalfWidth;
+    quad.points[2].x = farX + sideX * swordHalfWidth;
+    quad.points[2].y = farY + sideY * swordHalfWidth;
+    quad.points[3].x = farX - sideX * swordHalfWidth;
+    quad.points[3].y = farY - sideY * swordHalfWidth;
+
+    return quad;
+}
+
 rect2D _player::attackBounds() const
 {
-    const float sweepDegrees = 45.0f;
-    const float angleDegrees = getFacingAngleDegrees() - (sweepDegrees * getAttackProgress());
-    const float angleRadians = angleDegrees * PI / 180.0f;
-
-    const float hitboxHalfWidth = 0.16f;
-    const float hitboxHalfHeight = 0.10f;
-    const float reach = 0.42f;
-
-    const float centerX = (float)pos.x + cos(angleRadians) * reach;
-    const float centerY = (float)pos.y + sin(angleRadians) * reach;
-
+    quad2D swordQuad = attackQuad();
     rect2D bounds;
-    bounds.left = centerX - hitboxHalfWidth;
-    bounds.right = centerX + hitboxHalfWidth;
-    bounds.bottom = centerY - hitboxHalfHeight;
-    bounds.top = centerY + hitboxHalfHeight;
+    bounds.left = swordQuad.points[0].x;
+    bounds.right = swordQuad.points[0].x;
+    bounds.bottom = swordQuad.points[0].y;
+    bounds.top = swordQuad.points[0].y;
+
+    for (int i = 1; i < 4; i++)
+    {
+        bounds.left = min(bounds.left, swordQuad.points[i].x);
+        bounds.right = max(bounds.right, swordQuad.points[i].x);
+        bounds.bottom = min(bounds.bottom, swordQuad.points[i].y);
+        bounds.top = max(bounds.top, swordQuad.points[i].y);
+    }
+
     return bounds;
 }
 
@@ -239,7 +280,6 @@ void _player::playerActions(float deltaT)
         case STAND:
             setIdleFrame();
             break;
-
         case LEFTWALK:
             facingDirection = FACE_LEFT;
             pos.x -= moveSpeed * deltaT;
@@ -249,7 +289,6 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
-
         case RIGHTWALK:
             facingDirection = FACE_RIGHT;
             pos.x += moveSpeed * deltaT;
@@ -259,7 +298,6 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
-
         case WALKUP:
             facingDirection = FACE_UP;
             pos.y += moveSpeed * deltaT;
@@ -269,7 +307,6 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
-
         case WALKDOWN:
             facingDirection = FACE_DOWN;
             pos.y -= moveSpeed * deltaT;
@@ -279,17 +316,9 @@ void _player::playerActions(float deltaT)
                 timer = 0;
             }
             break;
-
-        case BLOCK:
-            break;
-
-        case HIT: //for when the PLAYER gets hit
-            break;
-
         case ATTACK:
             setIdleFrame();
             break;
-
         default: break;
 
     }

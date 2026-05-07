@@ -1,4 +1,6 @@
 #include "_scene.h"
+#include "_enemyMoblin.h"
+#include "_enemyOck.h"
 
 int loc;
 
@@ -15,6 +17,12 @@ namespace
         rect.top = top;
         return rect;
     }
+
+    std::mt19937& dungeonEnemyRng()
+    {
+        static std::mt19937 generator((unsigned int)std::chrono::steady_clock::now().time_since_epoch().count());
+        return generator;
+    }
 }
 
 _scene::_scene()
@@ -30,7 +38,17 @@ _scene::_scene()
     playerSpawn.z = -8.0f;
 
     overworldSpawn = playerSpawn;
-    dungeonEntranceZone = makeRect(-0.50f, 0.50f, 0.35f, 0.95f);
+    dungeon1EntranceZone = makeRect(-0.50f, 0.50f, 0.35f, 0.95f);
+    dungeon2EntranceZone = makeRect(-2.50f, -1.50f, 0.35f, 0.95f);
+    dungeon3EntranceZone = makeRect(1.50f, 2.50f, 0.35f, 0.95f);
+    overworldEnemyCount = 0;
+    dungeonRoomEnemyCount = 0;
+
+    for (int i = 0; i < MAX_OVERWORLD_ENEMIES; i++)
+    {
+        overworldEnemies[i] = NULL;
+        dungeonRoomEnemies[i] = NULL;
+    }
 }
 
 _scene::~_scene()
@@ -46,6 +64,11 @@ _scene::~_scene()
     delete snds;
     delete hit;
     delete dungeon1;
+    delete dungeon2;
+    delete dungeon3;
+
+    clearEnemyGroup(overworldEnemies, overworldEnemyCount);
+    clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
 }
 
 GLint _scene::initGL()
@@ -69,19 +92,19 @@ GLint _scene::initGL()
 
     //myQuad->initQuad("images/crate.png");
 
-    ply->plyInit(3, 8, "images/SpriteSheet.png");
+    ply->plyInit(4, 4, "images/BlueLink.png");
     ply->scale.x = 0.25f;
     ply->scale.y = 0.25f;
     ply->scale.z = 0.25f;
     respawnPlayer();
     setupCollisionMap();
     setupDungeon();
+    initOverworldEnemies();
     stateManager->init();   //init game state
 
 
-    snds->initSound();
-    sfx->initSound();
-    snds->playMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
+    //snds->initSound();
+    //sds->playMusic("sounds/BackOnTrack.mp3");
 
     return true;
 }
@@ -129,17 +152,149 @@ void _scene::setupCollisionMap()
 
 void _scene::setupDungeon()
 {
-    dungeon1->loadDungeon("images/Dungeons/level1.png", "images/Dungeons/level1_rooms.txt");
+    dungeon1->load();
+    dungeon2->load();
+    dungeon3->load();
 }
 
-void _scene::syncPlayerToDungeon()
+void _scene::initOverworldEnemies()
 {
-    if (!inDungeon || !dungeon1->isLoaded())
+    clearEnemyGroup(overworldEnemies, overworldEnemyCount);
+
+    if (overworldEnemyCount >= MAX_OVERWORLD_ENEMIES)
     {
         return;
     }
 
-    const float scale = dungeon1->currentPlayerScale();
+    _enemyOck* testEnemy = new _enemyOck();
+    testEnemy->initOck();
+
+    overworldEnemies[overworldEnemyCount] = testEnemy;
+    overworldEnemyCount++;
+
+    if (overworldEnemyCount >= MAX_OVERWORLD_ENEMIES)
+    {
+        return;
+    }
+
+    _enemyMoblin* testMoblin = new _enemyMoblin();
+    testMoblin->initMoblin();
+
+    overworldEnemies[overworldEnemyCount] = testMoblin;
+    overworldEnemyCount++;
+}
+
+void _scene::clearEnemyGroup(_enemies* enemies[], int& enemyCount)
+{
+    for (int i = 0; i < MAX_OVERWORLD_ENEMIES; i++)
+    {
+        delete enemies[i];
+        enemies[i] = NULL;
+    }
+
+    enemyCount = 0;
+}
+
+void _scene::spawnDungeonRoomEnemies()
+{
+    clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+
+    if (!inDungeon || activeDungeon == NULL)
+    {
+        return;
+    }
+
+    const std::string roomName = activeDungeon->currentRoomName();
+    const bool isDungeon1Room = activeDungeon == dungeon1;
+    const bool isDungeon2Room = activeDungeon == dungeon2;
+
+    if (!isDungeon1Room && !isDungeon2Room)
+    {
+        return;
+    }
+
+    if ((isDungeon1Room && (roomName == "top_room" || roomName == "bottom_room")) ||
+        (isDungeon2Room && (roomName == "left_room" || roomName == "boss_room")))
+    {
+        return;
+    }
+
+    std::vector<vec3> candidates = activeDungeon->currentWalkableTileCenters();
+    if (candidates.empty())
+    {
+        return;
+    }
+
+    const float tileSize = activeDungeon->currentTileWorldSizeValue();
+    const vec3 playerRoomSpawn = activeDungeon->currentSpawnWorld();
+    std::vector<vec3> filteredCandidates;
+
+    for (size_t i = 0; i < candidates.size(); i++)
+    {
+        const vec3& candidate = candidates[i];
+        const float deltaX = (float)candidate.x - (float)playerRoomSpawn.x;
+        const float deltaY = (float)candidate.y - (float)playerRoomSpawn.y;
+        const float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        const float minimumDistance = tileSize * 3.0f;
+
+        if (distanceSquared < minimumDistance * minimumDistance)
+        {
+            continue;
+        }
+
+        filteredCandidates.push_back(candidate);
+    }
+
+    if (!filteredCandidates.empty())
+    {
+        candidates = filteredCandidates;
+    }
+
+    std::shuffle(candidates.begin(), candidates.end(), dungeonEnemyRng());
+
+    std::uniform_int_distribution<int> spawnCountDistribution(1, 4);
+    const int desiredSpawnCount = spawnCountDistribution(dungeonEnemyRng());
+    const int spawnCount = std::min(desiredSpawnCount, (int)candidates.size());
+
+    for (int i = 0; i < spawnCount && dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES; i++)
+    {
+        _enemies* roomEnemy = NULL;
+
+        if (isDungeon1Room)
+        {
+            _enemyOck* ock = new _enemyOck();
+            ock->initOck();
+            roomEnemy = ock;
+        }
+        else if (isDungeon2Room)
+        {
+            _enemyMoblin* moblin = new _enemyMoblin();
+            moblin->initMoblin();
+            roomEnemy = moblin;
+        }
+
+        if (roomEnemy == NULL)
+        {
+            continue;
+        }
+
+        roomEnemy->pos = candidates[i];
+        roomEnemy->moveStartPos = roomEnemy->pos;
+        roomEnemy->moveTargetPos = roomEnemy->pos;
+
+        dungeonRoomEnemies[dungeonRoomEnemyCount] = roomEnemy;
+        dungeonRoomEnemyCount++;
+    }
+}
+
+void _scene::syncPlayerToDungeon()
+{
+    if (!inDungeon || activeDungeon == NULL || !activeDungeon->isLoaded())
+    {
+        return;
+    }
+
+    const float scale = activeDungeon->currentPlayerScale();
     ply->scale.x = scale;
     ply->scale.y = scale;
     ply->scale.z = scale;
@@ -147,25 +302,103 @@ void _scene::syncPlayerToDungeon()
 
 void _scene::enterDungeon1()
 {
-    if (!dungeon1->isLoaded())
+    enterDungeon(dungeon1);
+}
+
+void _scene::enterDungeon2()
+{
+    enterDungeon(dungeon2);
+}
+
+void _scene::enterDungeon3()
+{
+    enterDungeon(dungeon3);
+}
+
+void _scene::enterDungeon(_dungeon* dungeon)
+{
+    if (!dungeon || !dungeon->isLoaded())
     {
         return;
     }
 
+    if (!dungeon->enterDefaultRoom())
+    {
+        return;
+    }
+
+    activeDungeon = dungeon;
     inDungeon = true;
-    dungeon1->enterRoom("top_room");
     syncPlayerToDungeon();
-    ply->pos = dungeon1->currentSpawnWorld();
+    ply->pos = activeDungeon->currentSpawnWorld();
     ply->finishAttack();
+    spawnDungeonRoomEnemies();
+}
+
+vec3 _scene::overworldSpawnForDungeon(const _dungeon* dungeon) const
+{
+    vec3 spawn = overworldSpawn;
+    spawn.z = -8.0f;
+
+    if (dungeon == dungeon1)
+    {
+        spawn.x = 0.0f;
+        spawn.y = 0.10f;
+    }
+    else if (dungeon == dungeon2)
+    {
+        spawn.x = -2.0f;
+        spawn.y = 0.10f;
+    }
+    else if (dungeon == dungeon3)
+    {
+        spawn.x = 2.0f;
+        spawn.y = 0.10f;
+    }
+
+    return spawn;
+}
+
+bool _scene::isEnemyPositionWalkable(const _enemies* enemy, vec3 position) const
+{
+    if (enemy == NULL)
+    {
+        return false;
+    }
+
+    const rect2D enemyBox = enemy->collisionBoundsAt(position);
+    return !collidesWithWall(enemyBox) && !fallsIntoPit(enemyBox);
+}
+
+void _scene::exitDungeon()
+{
+    if (activeDungeon == NULL)
+    {
+        return;
+    }
+
+    vec3 spawn = overworldSpawnForDungeon(activeDungeon);
+    inDungeon = false;
+    activeDungeon = NULL;
+    ply->pos = spawn;
+    ply->finishAttack();
+    ply->scale.x = 0.25f;
+    ply->scale.y = 0.25f;
+    ply->scale.z = 0.25f;
+    clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
 }
 
 bool _scene::collidesWithWall(vec3 position) const
 {
     rect2D playerBox = ply->collisionBoundsAt(position);
+    return collidesWithWall(playerBox);
+}
 
+bool _scene::collidesWithWall(rect2D playerBox) const
+{
     if (inDungeon)
     {
-        return dungeon1->collidesWithWall(playerBox);
+        return activeDungeon != NULL ? activeDungeon->collidesWithWall(playerBox) : false;
     }
 
     for (size_t i = 0; i < wallZones.size(); i++)
@@ -181,12 +414,16 @@ bool _scene::collidesWithWall(vec3 position) const
 
 bool _scene::fallsIntoPit(vec3 position) const
 {
+    rect2D playerBox = ply->collisionBoundsAt(position);
+    return fallsIntoPit(playerBox);
+}
+
+bool _scene::fallsIntoPit(rect2D playerBox) const
+{
     if (inDungeon)
     {
         return false;
     }
-
-    rect2D playerBox = ply->collisionBoundsAt(position);
 
     for (size_t i = 0; i < pitZones.size(); i++)
     {
@@ -230,7 +467,10 @@ void _scene::drawCollisionDebug() const
     {
         if (inDungeon)
         {
-            dungeon1->drawCollisionDebug();
+            if (activeDungeon != NULL)
+            {
+                activeDungeon->drawCollisionDebug();
+            }
         }
         else
         {
@@ -260,10 +500,26 @@ void _scene::drawCollisionDebug() const
 
             glColor3f(0.2f, 0.8f, 1.0f);
             glBegin(GL_LINE_LOOP);
-                glVertex3f(dungeonEntranceZone.left, dungeonEntranceZone.bottom, debugZ);
-                glVertex3f(dungeonEntranceZone.right, dungeonEntranceZone.bottom, debugZ);
-                glVertex3f(dungeonEntranceZone.right, dungeonEntranceZone.top, debugZ);
-                glVertex3f(dungeonEntranceZone.left, dungeonEntranceZone.top, debugZ);
+                glVertex3f(dungeon1EntranceZone.left, dungeon1EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon1EntranceZone.right, dungeon1EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon1EntranceZone.right, dungeon1EntranceZone.top, debugZ);
+                glVertex3f(dungeon1EntranceZone.left, dungeon1EntranceZone.top, debugZ);
+            glEnd();
+
+            glColor3f(0.3f, 1.0f, 0.4f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(dungeon2EntranceZone.left, dungeon2EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon2EntranceZone.right, dungeon2EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon2EntranceZone.right, dungeon2EntranceZone.top, debugZ);
+                glVertex3f(dungeon2EntranceZone.left, dungeon2EntranceZone.top, debugZ);
+            glEnd();
+
+            glColor3f(1.0f, 0.6f, 0.2f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(dungeon3EntranceZone.left, dungeon3EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon3EntranceZone.right, dungeon3EntranceZone.bottom, debugZ);
+                glVertex3f(dungeon3EntranceZone.right, dungeon3EntranceZone.top, debugZ);
+                glVertex3f(dungeon3EntranceZone.left, dungeon3EntranceZone.top, debugZ);
             glEnd();
         }
 
@@ -275,10 +531,31 @@ void _scene::drawCollisionDebug() const
             glVertex3f(playerBox.right, playerBox.top, debugZ);
             glVertex3f(playerBox.left, playerBox.top, debugZ);
         glEnd();
+
+        if (!inDungeon)
+        {
+            for (int i = 0; i < overworldEnemyCount; i++)
+            {
+                if (overworldEnemies[i] == NULL || !overworldEnemies[i]->isEnmsLive)
+                {
+                    continue;
+                }
+
+                rect2D enemyBox = overworldEnemies[i]->collisionBounds();
+                glColor3f(1.0f, 0.15f, 0.85f);
+                glBegin(GL_LINE_LOOP);
+                    glVertex3f(enemyBox.left, enemyBox.bottom, debugZ);
+                    glVertex3f(enemyBox.right, enemyBox.bottom, debugZ);
+                    glVertex3f(enemyBox.right, enemyBox.top, debugZ);
+                    glVertex3f(enemyBox.left, enemyBox.top, debugZ);
+                glEnd();
+            }
+        }
     }
 
     if (ply->isAttackActive)
     {
+        quad2D attackQuad = ply->attackQuad();
         rect2D attackBox = ply->attackBounds();
 
         glEnable(GL_BLEND);
@@ -286,25 +563,80 @@ void _scene::drawCollisionDebug() const
 
         glColor4f(0.95f, 0.95f, 0.20f, 0.25f);
         glBegin(GL_QUADS);
-            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.top, debugZ);
-            glVertex3f(attackBox.left, attackBox.top, debugZ);
+            glVertex3f(attackQuad.points[0].x, attackQuad.points[0].y, debugZ);
+            glVertex3f(attackQuad.points[1].x, attackQuad.points[1].y, debugZ);
+            glVertex3f(attackQuad.points[2].x, attackQuad.points[2].y, debugZ);
+            glVertex3f(attackQuad.points[3].x, attackQuad.points[3].y, debugZ);
         glEnd();
 
         glColor3f(1.0f, 0.95f, 0.25f);
         glBegin(GL_LINE_LOOP);
-            glVertex3f(attackBox.left, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.bottom, debugZ);
-            glVertex3f(attackBox.right, attackBox.top, debugZ);
-            glVertex3f(attackBox.left, attackBox.top, debugZ);
+            glVertex3f(attackQuad.points[0].x, attackQuad.points[0].y, debugZ);
+            glVertex3f(attackQuad.points[1].x, attackQuad.points[1].y, debugZ);
+            glVertex3f(attackQuad.points[2].x, attackQuad.points[2].y, debugZ);
+            glVertex3f(attackQuad.points[3].x, attackQuad.points[3].y, debugZ);
         glEnd();
+
+        if (showCollisionDebug)
+        {
+            glColor3f(1.0f, 0.45f, 0.10f);
+            glBegin(GL_LINE_LOOP);
+                glVertex3f(attackBox.left, attackBox.bottom, debugZ);
+                glVertex3f(attackBox.right, attackBox.bottom, debugZ);
+                glVertex3f(attackBox.right, attackBox.top, debugZ);
+                glVertex3f(attackBox.left, attackBox.top, debugZ);
+            glEnd();
+        }
 
         glDisable(GL_BLEND);
     }
 
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
+}
+
+void _scene::updateAndDrawEnemyGroup(_enemies* enemies[], int& enemyCount)
+{
+    const bool playerAttackActive = ply->isAttackActive;
+    const int playerAttackId = ply->currentAttackId();
+    const rect2D playerAttackBox = playerAttackActive ? ply->attackBounds() : rect2D();
+
+    for (int i = 0; i < enemyCount; i++)
+    {
+        if (enemies[i] == NULL || !enemies[i]->isEnmsLive)
+        {
+            continue;
+        }
+
+        vec3 previousEnemyPos = enemies[i]->pos;
+        enemies[i]->enmsActions(deltaTime, &ply->pos, this);
+
+        if (enemies[i]->startedMoveThisFrame &&
+            (collidesWithWall(enemies[i]->collisionBoundsAt(enemies[i]->moveTargetPos)) ||
+             fallsIntoPit(enemies[i]->collisionBoundsAt(enemies[i]->moveTargetPos))))
+        {
+            enemies[i]->cancelMove();
+        }
+        else if (collidesWithWall(enemies[i]->collisionBounds()) ||
+                 fallsIntoPit(enemies[i]->collisionBounds()))
+        {
+            enemies[i]->pos = previousEnemyPos;
+            enemies[i]->cancelMove();
+        }
+
+        if (playerAttackActive &&
+            hit->isRectCollide(playerAttackBox, enemies[i]->collisionBounds()))
+        {
+            enemies[i]->takeDamage(1, playerAttackId, (_enemies::FacingDirection)ply->facingDirection);
+        }
+
+        if (!enemies[i]->isEnmsLive)
+        {
+            continue;
+        }
+
+        enemies[i]->drawEnms();
+    }
 }
 
 void _scene::drawScene()
@@ -333,13 +665,6 @@ void _scene::drawScene()
     //Mymodel->drawModel();
     //myVBO->drawmodel();
 
-    if(ply->actionTrigger == ply->ATTACK){
-        sfx->playSounds("sounds/attack.mp3");
-    }
-
-    if(ply->actionTrigger == ply->LEFTWALK || ply->actionTrigger == ply->RIGHTWALK || ply->actionTrigger == ply->WALKDOWN || ply->actionTrigger == ply->WALKUP){
-        sfx->playSounds("sounds/8 bit walk cycle.mp3");
-    }
 
     if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU) {
         glEnable(GL_DEPTH_TEST);
@@ -356,7 +681,15 @@ void _scene::drawScene()
         }
         else
         {
-            dungeon1->drawCurrentRoom();
+            if (activeDungeon != NULL)
+            {
+                activeDungeon->drawCurrentRoom();
+            }
+        }
+
+        if (stateManager->currentState == PLAYING)
+        {
+            myKbMs->syncPlayerMovement(ply);
         }
 
         vec3 previousPlayerPos = ply->pos;
@@ -365,9 +698,17 @@ void _scene::drawScene()
         if (inDungeon)
         {
             rect2D playerBox = ply->collisionBounds();
-            if (dungeon1->updateRoomTransition(ply->pos, playerBox))
+            if (activeDungeon != NULL && activeDungeon->updateRoomTransition(ply->pos, playerBox))
             {
-                syncPlayerToDungeon();
+                if (activeDungeon->consumePendingOverworldExit())
+                {
+                    exitDungeon();
+                }
+                else
+                {
+                    syncPlayerToDungeon();
+                    spawnDungeonRoomEnemies();
+                }
             }
             else if (collidesWithWall(ply->pos))
             {
@@ -384,9 +725,26 @@ void _scene::drawScene()
             respawnPlayer();
         }
 
-        if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeonEntranceZone))
+        if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon1EntranceZone))
         {
             enterDungeon1();
+        }
+        else if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon2EntranceZone))
+        {
+            enterDungeon2();
+        }
+        else if (!inDungeon && hit->isRectCollide(ply->collisionBounds(), dungeon3EntranceZone))
+        {
+            enterDungeon3();
+        }
+
+        if (!inDungeon)
+        {
+            updateAndDrawEnemyGroup(overworldEnemies, overworldEnemyCount);
+        }
+        else if (activeDungeon == dungeon1 || activeDungeon == dungeon2)
+        {
+            updateAndDrawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
         }
 
         ply->updateQuad();
@@ -455,7 +813,7 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
 
-        myKbMs->wParam = wParam;
+        myKbMs->handleKeyDown(wParam);
         myKbMs->keyPressed(Mymodel);
         //cout << "came here "<< endl;
         myKbMs->keyPressed(myVBO);
@@ -469,20 +827,8 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
 
-        if (!ply->isAttackActive)
-        {
-            switch (wParam)
-            {
-                case VK_LEFT:
-                case VK_RIGHT:
-                case VK_UP:
-                case VK_DOWN:
-                    ply->actionTrigger = ply->STAND;
-                    break;
-                default:
-                    break;
-            }
-        }
+        myKbMs->handleKeyUp(wParam);
+        myKbMs->syncPlayerMovement(ply);
         break;
 
     case WM_LBUTTONDOWN:
