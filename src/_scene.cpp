@@ -624,6 +624,13 @@ void _scene::enterDungeon3()
 
 void _scene::enterDungeon(_dungeon* dungeon)
 {
+
+    if(snds->sndEng->isCurrentlyPlaying("sounds/CHAINDIVE - 1st STAGE.mp3")){
+        //snds->snd->stop();
+        snds->stopMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
+        snds->playMusic("sounds/Dark Pit - Kid Icarus Uprising OST.mp3");
+    }
+
     if (!dungeon || !dungeon->isLoaded())
     {
         return;
@@ -931,6 +938,13 @@ rect2D _scene::currentOverworldDungeonEntranceZone() const
 
 void _scene::exitDungeon()
 {
+
+    if(snds->sndEng->isCurrentlyPlaying("sounds/Dark Pit - Kid Icarus Uprising OST.mp3")){
+        //snds->snd->stop();
+        snds->stopMusic("sounds/Dark Pit - Kid Icarus Uprising OST.mp3");
+        snds->playMusic("sounds/CHAINDIVE - 1st STAGE.mp3");
+    }
+
     if (activeDungeon == NULL)
     {
         return;

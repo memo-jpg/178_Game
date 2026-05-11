@@ -9,6 +9,21 @@ _sounds::~_sounds()
 {
     //dtor
     sndEng->drop();
+
+    /*
+    if (snd)
+    {
+        snd->stop();
+        snd->drop();
+        snd = nullptr;
+    }
+
+    if (sndEng)
+    {
+        sndEng->drop();
+        sndEng = nullptr;
+    }
+    */
 }
 void _sounds::playMusic(char* fileName)
 {
@@ -20,16 +35,37 @@ void _sounds::playMusic(char* fileName)
 
 void _sounds::playSounds(char* fileName)
 {
+
     if (!sndEng->isCurrentlyPlaying(fileName))
     {
         sndEng->play2D(fileName, false, false);
     }
+
+    /*
+    if (snd)
+    {
+        snd->stop();
+        snd->drop();
+        snd = nullptr;
+    }
+
+    wav = sndEng->addSoundSourceFromFile(fileName);
+    wav->setDefaultVolume(0.15f);
+
+    snd = sndEng->play2D(fileName, true, false, true);
+    */
 }
 
 void _sounds::pauseSound(char* fileName)
 {
     sndEng->play2D(fileName, true, false);
 }
+
+void _sounds::stopMusic(char* fileName)
+{
+    sndEng->removeSoundSource(fileName);
+}
+
 
 void _sounds::initSound()
 {
