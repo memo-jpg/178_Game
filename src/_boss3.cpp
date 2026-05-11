@@ -1,40 +1,39 @@
-#include "_enemyCently.h"
+#include "_boss3.h"
 
-_enemyCently::_enemyCently()
+_boss3::_boss3()
 {
     pos.x = 0.0f;
     pos.y = -0.85f;
     pos.z = -8.0f;
 
-    scale.x = 0.245f;
-    scale.y = 0.245f;
+    scale.x = 0.32f;
+    scale.y = 0.32f;
     scale.z = 1.0f;
 
-    maxHealth = 2;
-    health = 2;
+    maxHealth = 9;
+    health = 9;
     actionTrigger = STAND;
-    moveInterval = 1.0f;
-    moveDuration = 0.5f;
+    moveInterval = 0.75f;
+    moveDuration = 0.3f;
     chargeShader = new _shader();
     chargeShaderInitialized = false;
     isChargingAttack = false;
     isProjectileAttackActive = false;
     chargeTimer = 0.0f;
-    chargeDuration = 1.0f;
+    chargeDuration = 0.75f;
     attackCooldownTimer = 0.0f;
-    attackCooldownDuration = 5.0f;
-    projectileSpeedTilesPerSecond = 6.0f;
-    detectionLengthTiles = 5.0f;
-    detectionWidthScale = 1.15f;
+    attackCooldownDuration = 2.8f;
+    projectileSpeedTilesPerSecond = 9.0f;
+    detectionLengthTiles = 7.0f;
+    detectionWidthScale = 1.4f;
 }
 
-_enemyCently::~_enemyCently()
+_boss3::~_boss3()
 {
-    //dtor
     delete chargeShader;
 }
 
-void _enemyCently::ensureChargeShader()
+void _boss3::ensureChargeShader()
 {
     if (chargeShaderInitialized || chargeShader == NULL)
     {
@@ -45,7 +44,7 @@ void _enemyCently::ensureChargeShader()
     chargeShaderInitialized = true;
 }
 
-rect2D _enemyCently::attackTriggerBounds() const
+rect2D _boss3::attackTriggerBounds() const
 {
     const float tileLength = tileStepDistance * detectionLengthTiles;
     const float halfWidth = (float)scale.x * collisionWidthScale * detectionWidthScale;
@@ -85,7 +84,7 @@ rect2D _enemyCently::attackTriggerBounds() const
     return bounds;
 }
 
-void _enemyCently::startChargeAttack()
+void _boss3::startChargeAttack()
 {
     haltMove();
     isChargingAttack = true;
@@ -94,7 +93,7 @@ void _enemyCently::startChargeAttack()
     actionTrigger = ATTACK;
 }
 
-void _enemyCently::finishAttackCycle()
+void _boss3::finishAttackCycle()
 {
     projectile.deactivate();
     isChargingAttack = false;
@@ -104,13 +103,13 @@ void _enemyCently::finishAttackCycle()
     timer = 0.0f;
 }
 
-void _enemyCently::fireProjectile()
+void _boss3::fireProjectile()
 {
     vec2 direction = facingVector();
     vec3 projectileStart = pos;
     vec3 projectileDirection;
-    const float launchOffset = tileStepDistance * 0.7f;
-    const float projectileScale = tileStepDistance * 0.42f;
+    const float launchOffset = tileStepDistance * 0.8f;
+    const float projectileScale = tileStepDistance * 0.6f;
 
     projectileStart.x += direction.x * launchOffset;
     projectileStart.y += direction.y * launchOffset;
@@ -130,7 +129,7 @@ void _enemyCently::fireProjectile()
     );
 }
 
-void _enemyCently::enmsActions(float deltaT, const vec3* playerPos, const _enemyNavigation* navigation)
+void _boss3::enmsActions(float deltaT, const vec3* playerPos, const _enemyNavigation* navigation)
 {
     startedMoveThisFrame = false;
     animationTimer += deltaT;
@@ -199,7 +198,7 @@ void _enemyCently::enmsActions(float deltaT, const vec3* playerPos, const _enemy
     }
 }
 
-void _enemyCently::drawEnms()
+void _boss3::drawEnms()
 {
     if (isChargingAttack)
     {
@@ -207,27 +206,27 @@ void _enemyCently::drawEnms()
 
         if (chargeShaderInitialized && chargeShader != NULL)
         {
-            const bool useBrightWhite = ((int)floor(chargeTimer * 10.0f) % 2) == 0;
+            const bool useBrightWhite = ((int)floor(chargeTimer * 12.0f) % 2) == 0;
             vec3 shadowColor;
             vec3 highlightColor;
 
             if (useBrightWhite)
             {
-                shadowColor.x = 0.72f;
-                shadowColor.y = 0.72f;
-                shadowColor.z = 0.72f;
+                shadowColor.x = 0.70f;
+                shadowColor.y = 0.70f;
+                shadowColor.z = 0.70f;
                 highlightColor.x = 1.0f;
                 highlightColor.y = 1.0f;
                 highlightColor.z = 1.0f;
             }
             else
             {
-                shadowColor.x = 0.48f;
-                shadowColor.y = 0.48f;
-                shadowColor.z = 0.48f;
-                highlightColor.x = 0.90f;
-                highlightColor.y = 0.90f;
-                highlightColor.z = 0.90f;
+                shadowColor.x = 0.18f;
+                shadowColor.y = 0.18f;
+                shadowColor.z = 0.18f;
+                highlightColor.x = 0.78f;
+                highlightColor.y = 0.92f;
+                highlightColor.z = 1.0f;
             }
 
             drawSelfWithPalette(chargeShader, shadowColor, highlightColor);
@@ -245,18 +244,17 @@ void _enemyCently::drawEnms()
     projectile.drawBlt();
 }
 
-void _enemyCently::initCently()
+void _boss3::initBoss3()
 {
     const int enemySheetWidth = 437;
     const int enemySheetHeight = 346;
     const int centlyRegionWidth = 120;
     const int centlyRegionHeight = 60;
 
-    enmsInit(4, 2, "images/enemies_sheet.png");
-    projectile.initBlt(1, 1, "images/bs.png");
-    projectile.flashEnabled = true;
-    projectile.deactivate();
-    setSpriteRegionPixels(
+    initBossSprite(
+        4,
+        2,
+        "images/enemies_sheet.png",
         enemySheetWidth,
         enemySheetHeight,
         0,
@@ -264,4 +262,8 @@ void _enemyCently::initCently()
         centlyRegionWidth,
         centlyRegionHeight
     );
+
+    projectile.initBlt(1, 1, "images/bs.png");
+    projectile.flashEnabled = true;
+    projectile.deactivate();
 }

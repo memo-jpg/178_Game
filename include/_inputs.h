@@ -23,6 +23,7 @@ class _inputs
         void handleKeyDown(WPARAM);
         void handleKeyUp(WPARAM);
         void syncPlayerMovement(_player*);
+        void resetPlayerInput();
 
         void mouseEventDown(_model*, double, double);
         void mouseEventUp();

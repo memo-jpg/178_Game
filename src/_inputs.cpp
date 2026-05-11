@@ -136,6 +136,18 @@ void _inputs::syncPlayerMovement(_player* qD)
     }
 }
 
+void _inputs::resetPlayerInput()
+{
+    wParam = 0;
+    nextDirectionOrder = 0;
+
+    for (int i = 0; i < DIR_COUNT; i++)
+    {
+        directionHeld[i] = false;
+        directionOrder[i] = 0;
+    }
+}
+
 void _inputs::mouseEventDown(_model *mdl, double x, double y)
 {
     prevMx = x;

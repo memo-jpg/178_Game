@@ -16,9 +16,13 @@ _player::_player()
     collisionWidthScale = 0.576f;
     collisionHeightScale = 0.576f;
     collisionOffsetY = 0.0f;
+    invulnerabilityTimer = 0.0f;
+    invulnerabilityDuration = 1.0f;
     currentFrame = 0;
     attackId = 0;
     actionTrigger = STAND;
+    maxHitPoints = 3;
+    hitPoints = maxHitPoints;
     facingDirection = FACE_DOWN;
     isAttackActive = false;
 }
@@ -70,6 +74,15 @@ vec3 _player::visualOffset() const
 
 void _player::drawPlayer()
 {
+    if (isInvulnerable())
+    {
+        const float blinkCycle = 0.14f;
+        if (fmod(invulnerabilityTimer, blinkCycle) < (blinkCycle * 0.5f))
+        {
+            return;
+        }
+    }
+
     const vec3 basePos = pos;
     const vec3 offset = visualOffset();
 
@@ -257,9 +270,75 @@ rect2D _player::attackBounds() const
     return bounds;
 }
 
+bool _player::takeHit(int damage)
+{
+    if (damage <= 0 || !isAlive() || isInvulnerable())
+    {
+        return false;
+    }
+
+    hitPoints -= damage;
+    if (hitPoints < 0)
+    {
+        hitPoints = 0;
+    }
+
+    invulnerabilityTimer = invulnerabilityDuration;
+    actionTrigger = STAND;
+
+    if (!isAlive())
+    {
+        finishAttack();
+    }
+
+    return true;
+}
+
+bool _player::heal(int amount)
+{
+    if (amount <= 0 || hitPoints >= maxHitPoints)
+    {
+        return false;
+    }
+
+    hitPoints = std::min(maxHitPoints, hitPoints + amount);
+    return true;
+}
+
+void _player::resetHealth()
+{
+    hitPoints = maxHitPoints;
+    invulnerabilityTimer = 0.0f;
+}
+
+bool _player::isAlive() const
+{
+    return hitPoints > 0;
+}
+
+int _player::currentHitPoints() const
+{
+    return hitPoints;
+}
+
+int _player::totalHitPoints() const
+{
+    return maxHitPoints;
+}
+
+bool _player::isInvulnerable() const
+{
+    return invulnerabilityTimer > 0.0f;
+}
+
 void _player::playerActions(float deltaT)
 {
     const float moveSpeed = 1.65f;
+
+    if (invulnerabilityTimer > 0.0f)
+    {
+        invulnerabilityTimer = std::max(0.0f, invulnerabilityTimer - deltaT);
+    }
 
     timer += deltaT;
 

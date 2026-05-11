@@ -19,10 +19,12 @@ class _fonts
         vec2 frames;
         int counter;// for character offset
         const char *mystr;
-         _quad f[500];
+        _quad f[500];
+        bool glyphVisible[500] = {false};
+        vec3 textPos = { -23.0, 10.0, -7.0 };
+        vec3 textScale = { 1.0, 1.0, 1.0 };
 
-    float offset =1.5;
-    bool valid =true; // to ignore invalid chars
+        float offset =1.5;
 
     protected:
 

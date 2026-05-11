@@ -1,367 +1,133 @@
 #include "_fonts.h"
 
+#include <cctype>
+#include <cstring>
+
+namespace
+{
+    const int FONT_GRID_COLUMNS = 10;
+    const int FONT_GRID_ROWS = 8;
+    const int MAX_FONT_GLYPHS = 500;
+    const char* FONT_ATLAS_ROWS[FONT_GRID_ROWS] =
+    {
+        "*+,-./0123",
+        "456789:;<=",
+        ">?@ABCDEFG",
+        "HIJKLMNOPQ",
+        "RSTUVWXYZ[",
+        "\\]^_`abcde",
+        "fghijklmno",
+        "pqrstuvwxy"
+    };
+
+    bool map8BitFontGlyph(char glyph, int& column, int& row)
+    {
+        if (glyph == ' ')
+        {
+            column = 0;
+            row = 0;
+            return true;
+        }
+
+        for (int atlasRow = 0; atlasRow < FONT_GRID_ROWS; atlasRow++)
+        {
+            for (int atlasColumn = 0; atlasColumn < FONT_GRID_COLUMNS; atlasColumn++)
+            {
+                if (FONT_ATLAS_ROWS[atlasRow][atlasColumn] == glyph)
+                {
+                    column = atlasColumn;
+                    row = atlasRow;
+                    return true;
+                }
+            }
+        }
+
+        if (glyph == 'z')
+        {
+            return map8BitFontGlyph('Z', column, row);
+        }
+
+        if (std::islower((unsigned char)glyph))
+        {
+            return map8BitFontGlyph((char)std::toupper((unsigned char)glyph), column, row);
+        }
+
+        return false;
+    }
+}
+
 _fonts::_fonts()
 {
-    //ctor
+    mystr = "";
+    counter = 0;
 }
 
 _fonts::~_fonts()
 {
     //dtor
 }
+
 void _fonts::initFonts(char* fileName)
 {
     f[0].initQuad(fileName);
 
-    for(int i =0; i<500; i++)
+    for (int i = 0; i < MAX_FONT_GLYPHS; i++)
     {
-         f[i].myTex->tex = f[0].myTex->tex;
-         f[i].initQuad(NULL);
+        f[i].myTex->tex = f[0].myTex->tex;
+        f[i].initQuad(NULL);
+        glyphVisible[i] = false;
     }
-
-  // todo: initialize all the quads
 }
 
 void _fonts::buildFonts(const char* str)
 {
-     mystr = str;
+    mystr = str != NULL ? str : "";
+    counter = (int)std::min(std::strlen(mystr), (size_t)MAX_FONT_GLYPHS);
 
-
-    for(int i =0; i<strlen(str); i++)
+    for (int i = 0; i < MAX_FONT_GLYPHS; i++)
     {
-     valid = true;
+        glyphVisible[i] = false;
+    }
 
-    switch(str[i])
+    for (int i = 0; i < counter; i++)
     {
-    case 'a':
-             f[i].xMin =0;
-             f[i].xMax =1.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-        break;
-    case 'b':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
+        int column = 0;
+        int row = 0;
+        glyphVisible[i] = map8BitFontGlyph(mystr[i], column, row);
 
-        break;
+        if (!glyphVisible[i])
+        {
+            continue;
+        }
 
-    case 'c':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-
-        break;
-
-    case 'd':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-
-        break;
-
-    case 'e':
-             f[i].xMin =4.0/7.0;
-             f[i].xMax =5.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-
-        break;
-    case 'f':
-             f[i].xMin =5.0/7.0;
-             f[i].xMax =6.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-
-        break;
-    case 'g':
-             f[i].xMin =6.0/7.0;
-             f[i].xMax =7.0/7.0;
-             f[i].yMin =0;
-             f[i].yMax = 1.0/6.0;
-             f[i].updateQuad();
-
-        break;
-    case 'h':
-             f[i].xMin =0.0/7.0;
-             f[i].xMax =1.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-     case 'i':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-     case 'j':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-      case 'k':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case 'l':
-             f[i].xMin =4.0/7.0;
-             f[i].xMax =5.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-         case 'm':
-             f[i].xMin =5.0/7.0;
-             f[i].xMax =6.0/7.0;
-             f[i].yMin =1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-         case 'n':
-             f[i].xMin = 6.0/7.0;
-             f[i].xMax = 7.0/7.0;
-             f[i].yMin = 1.0/6.0;
-             f[i].yMax = 2.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case 'o':
-             f[i].xMin = 0;
-             f[i].xMax = 1.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-        break;
-        case 'p':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case 'q':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case 'r':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case 's':
-             f[i].xMin =4.0/7.0;
-             f[i].xMax =5.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-        break;
-        case 't':
-             f[i].xMin =5.0/7.0;
-             f[i].xMax =6.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-
-        break;
-        case 'u':
-             f[i].xMin =6.0/7.0;
-             f[i].xMax =7.0/7.0;
-             f[i].yMin = 2.0/6.0;
-             f[i].yMax = 3.0/6.0;
-             f[i].updateQuad();
-
-        break;
-        case 'v':
-             f[i].xMin =0.0/7.0;
-             f[i].xMax =1.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case 'w':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case 'x':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case 'y':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case 'z':
-             f[i].xMin =4.0/7.0;
-             f[i].xMax =5.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case '!':
-             f[i].xMin =5.0/7.0;
-             f[i].xMax =6.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case '?':
-             f[i].xMin =6.0/7.0;
-             f[i].xMax =7.0/7.0;
-             f[i].yMin =3.0/6.0;
-             f[i].yMax = 4.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case '0':
-             f[i].xMin =0.0/7.0;
-             f[i].xMax =1.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax =5.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case '1':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax = 5.0/6.0;
-             f[i].updateQuad();
-        break;
-          case '2':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax = 5.0/6.0;
-             f[i].updateQuad();
-        break;
-
-         case '3':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax = 5.0/6.0;
-             f[i].updateQuad();
-        break;
-
-        case '4':
-             f[i].xMin =4.0/7.0;
-             f[i].xMax =5.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax = 5.0/6.0;
-             f[i].updateQuad();
-        break;
-          case '5':
-             f[i].xMin =5.0/7.0;
-             f[i].xMax =6.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax = 5.0/6.0;
-             f[i].updateQuad();
-        break;
-
-         case '6':
-             f[i].xMin =6.0/7.0;
-             f[i].xMax =7.0/7.0;
-             f[i].yMin =4.0/6.0;
-             f[i].yMax =5.0/6.0;
-             f[i].updateQuad();
-        break;
-          case '7':
-             f[i].xMin =0.0/7.0;
-             f[i].xMax =1.0/7.0;
-             f[i].yMin =5.0/6.0;
-             f[i].yMax =6.0/6.0;
-             f[i].updateQuad();
-        break;
-
-         case '8':
-             f[i].xMin =1.0/7.0;
-             f[i].xMax =2.0/7.0;
-             f[i].yMin =5.0/6.0;
-             f[i].yMax =6.0/6.0;
-             f[i].updateQuad();
-        break;
-          case '9':
-             f[i].xMin =2.0/7.0;
-             f[i].xMax =3.0/7.0;
-             f[i].yMin =5.0/6.0;
-             f[i].yMax =6.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          case ' ':
-             f[i].xMin =3.0/7.0;
-             f[i].xMax =4.0/7.0;
-             f[i].yMin =5.0/6.0;
-             f[i].yMax =6.0/6.0;
-             f[i].updateQuad();
-        break;
-
-          default:
-                valid = false;
-            break;
-     }
+        f[i].xMin = (float)column / (float)FONT_GRID_COLUMNS;
+        f[i].xMax = (float)(column + 1) / (float)FONT_GRID_COLUMNS;
+        f[i].yMin = (float)row / (float)FONT_GRID_ROWS;
+        f[i].yMax = (float)(row + 1) / (float)FONT_GRID_ROWS;
+        f[i].updateQuad();
     }
 }
 
 void _fonts::setPosition(float x, float y, float z)
 {
-
+    textPos.x = x;
+    textPos.y = y;
+    textPos.z = z;
 }
 
 void _fonts::drawFonts()
 {
-       for(int i =0; i<strlen(mystr); i++){
-
-        if(valid)
+    for (int i = 0; i < counter; i++)
+    {
+        if (!glyphVisible[i] || mystr[i] == ' ')
         {
-        f[i].pos.x =-23+i*offset;
-        f[i].pos.y = 10;
-        f[i].pos.z =-7;
+            continue;
+        }
+
+        f[i].pos.x = textPos.x + (i * offset);
+        f[i].pos.y = textPos.y;
+        f[i].pos.z = textPos.z;
+        f[i].scale = textScale;
         f[i].drawQuad();
-       }
-       }
+    }
 }

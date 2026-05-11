@@ -1,5 +1,7 @@
 #include "_scene.h"
 #include "_boss1.h"
+#include "_boss2.h"
+#include "_boss3.h"
 #include "_enemyCently.h"
 #include "_enemyMoblin.h"
 #include "_enemyOck.h"
@@ -62,6 +64,8 @@ _scene::~_scene()
     delete snds;
     delete sfx;
     delete hit;
+    delete hudFont;
+    delete gameOverFont;
     delete overworld;
     delete dungeon1;
     delete dungeon2;
@@ -96,6 +100,18 @@ GLint _scene::initGL()
     ply->scale.x = 0.25f;
     ply->scale.y = 0.25f;
     ply->scale.z = 0.25f;
+    ply->resetHealth();
+
+    hudFont->initFonts("images/8BitFont.png");
+    hudFont->buildFonts("LIFE");
+    hudFont->offset = 0.075f;
+    hudFont->textScale = {0.034f, 0.034f, 1.0f};
+
+    gameOverFont->initFonts("images/8BitFont.png");
+    gameOverFont->buildFonts("GAME OVER");
+    gameOverFont->offset = 0.105f;
+    gameOverFont->textScale = {0.05f, 0.05f, 1.0f};
+
     setupOverworld();
     swordTex->loadTexture("images/Sword.png");
     dungeonExitTriggerSprite->initQuad("images/exit.png");
@@ -133,6 +149,7 @@ void _scene::setupOverworld()
 {
     wallZones.clear();
     pitZones.clear();
+    clearHealthPickups();
     if (overworld != NULL && overworld->load())
     {
         overworld->enterDefaultRoom();
@@ -151,6 +168,7 @@ void _scene::setupDungeon()
 void _scene::initOverworldEnemies()
 {
     clearEnemyGroup(overworldEnemies, overworldEnemyCount);
+    clearHealthPickups();
 
     if (overworld == NULL || !overworld->isLoaded() || overworld->currentRoomName() != "hub_room")
     {
@@ -221,9 +239,121 @@ void _scene::clearEnemyGroup(_enemies* enemies[], int& enemyCount)
     enemyCount = 0;
 }
 
+void _scene::clearHealthPickups()
+{
+    healthPickups.clear();
+}
+
+void _scene::maybeSpawnHealthPickup(vec3 position, float tileSize)
+{
+    if (ply == NULL || ply->currentHitPoints() >= ply->totalHitPoints())
+    {
+        return;
+    }
+
+    static std::uniform_real_distribution<float> dropChanceDistribution(0.0f, 1.0f);
+    if (dropChanceDistribution(dungeonEnemyRng()) > 0.75f)
+    {
+        return;
+    }
+
+    HealthPickup pickup;
+    pickup.pos = position;
+    pickup.pos.z += 0.01f;
+    pickup.halfSize = std::max(0.03f, tileSize * 0.16f);
+    pickup.active = true;
+    healthPickups.push_back(pickup);
+}
+
+void _scene::updateHealthPickups()
+{
+    if (ply == NULL || hit == NULL || healthPickups.empty())
+    {
+        return;
+    }
+
+    const rect2D playerBox = ply->collisionBounds();
+
+    for (size_t i = 0; i < healthPickups.size(); i++)
+    {
+        if (!healthPickups[i].active)
+        {
+            continue;
+        }
+
+        rect2D pickupBox;
+        pickupBox.left = (float)healthPickups[i].pos.x - healthPickups[i].halfSize;
+        pickupBox.right = (float)healthPickups[i].pos.x + healthPickups[i].halfSize;
+        pickupBox.bottom = (float)healthPickups[i].pos.y - healthPickups[i].halfSize;
+        pickupBox.top = (float)healthPickups[i].pos.y + healthPickups[i].halfSize;
+
+        if (hit->isRectCollide(playerBox, pickupBox))
+        {
+            ply->heal(1);
+            healthPickups[i].active = false;
+        }
+    }
+
+    healthPickups.erase(
+        std::remove_if(
+            healthPickups.begin(),
+            healthPickups.end(),
+            [](const HealthPickup& pickup) { return !pickup.active; }
+        ),
+        healthPickups.end()
+    );
+}
+
+void _scene::drawHealthPickups() const
+{
+    if (healthPickups.empty())
+    {
+        return;
+    }
+
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    for (size_t i = 0; i < healthPickups.size(); i++)
+    {
+        if (!healthPickups[i].active)
+        {
+            continue;
+        }
+
+        const float left = (float)healthPickups[i].pos.x - healthPickups[i].halfSize;
+        const float right = (float)healthPickups[i].pos.x + healthPickups[i].halfSize;
+        const float bottom = (float)healthPickups[i].pos.y - healthPickups[i].halfSize;
+        const float top = (float)healthPickups[i].pos.y + healthPickups[i].halfSize;
+        const float z = (float)healthPickups[i].pos.z;
+
+        glColor4f(0.88f, 0.14f, 0.14f, 0.96f);
+        glBegin(GL_QUADS);
+            glVertex3f(left, bottom, z);
+            glVertex3f(right, bottom, z);
+            glVertex3f(right, top, z);
+            glVertex3f(left, top, z);
+        glEnd();
+
+        glColor4f(0.20f, 0.03f, 0.03f, 0.98f);
+        glBegin(GL_LINE_LOOP);
+            glVertex3f(left, bottom, z + 0.0005f);
+            glVertex3f(right, bottom, z + 0.0005f);
+            glVertex3f(right, top, z + 0.0005f);
+            glVertex3f(left, top, z + 0.0005f);
+        glEnd();
+    }
+
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_LIGHTING);
+}
+
 void _scene::spawnDungeonRoomEnemies()
 {
     clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+    clearHealthPickups();
 
     if (!inDungeon || activeDungeon == NULL)
     {
@@ -235,15 +365,10 @@ void _scene::spawnDungeonRoomEnemies()
     const bool isDungeon2Room = activeDungeon == dungeon2;
     const bool isDungeon3Room = activeDungeon == dungeon3;
     const bool isDungeon1BossRoom = isDungeon1Room && roomName == "bottom_room";
+    const bool isDungeon2BossRoom = isDungeon2Room && roomName == "boss_room";
+    const bool isDungeon3BossRoom = isDungeon3Room && roomName == "boss_room";
 
     if (!isDungeon1Room && !isDungeon2Room && !isDungeon3Room)
-    {
-        return;
-    }
-
-    if ((isDungeon1Room && roomName == "top_room") ||
-        (isDungeon2Room && (roomName == "left_room" || roomName == "boss_room")) ||
-        (isDungeon3Room && (roomName == "left_room" || roomName == "boss_room")))
     {
         return;
     }
@@ -278,6 +403,105 @@ void _scene::spawnDungeonRoomEnemies()
             dungeonRoomEnemies[dungeonRoomEnemyCount++] = ock;
         }
 
+        return;
+    }
+
+    if (isDungeon2BossRoom)
+    {
+        const float tileSize = activeDungeon->currentTileWorldSizeValue();
+        const vec3 bossSpawn = activeDungeon->currentWorldPositionForTile(9.5f, 7.0f);
+        const vec3 moblinSpawns[2] =
+        {
+            activeDungeon->currentWorldPositionForTile(5.0f, 11.0f),
+            activeDungeon->currentWorldPositionForTile(14.0f, 11.0f)
+        };
+        const vec3 ockSpawns[2] =
+        {
+            activeDungeon->currentWorldPositionForTile(5.0f, 15.0f),
+            activeDungeon->currentWorldPositionForTile(14.0f, 15.0f)
+        };
+
+        _boss2* boss = new _boss2();
+        boss->initBoss2();
+        boss->tileStepDistance = tileSize;
+        boss->pos = bossSpawn;
+        boss->moveStartPos = boss->pos;
+        boss->moveTargetPos = boss->pos;
+        dungeonRoomEnemies[dungeonRoomEnemyCount++] = boss;
+
+        for (int i = 0; i < 2 && dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES; i++)
+        {
+            _enemyMoblin* moblin = new _enemyMoblin();
+            moblin->initMoblin();
+            moblin->tileStepDistance = tileSize;
+            moblin->pos = moblinSpawns[i];
+            moblin->moveStartPos = moblin->pos;
+            moblin->moveTargetPos = moblin->pos;
+            dungeonRoomEnemies[dungeonRoomEnemyCount++] = moblin;
+        }
+
+        for (int i = 0; i < 2 && dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES; i++)
+        {
+            _enemyOck* ock = new _enemyOck();
+            ock->initOck();
+            ock->tileStepDistance = tileSize;
+            ock->pos = ockSpawns[i];
+            ock->moveStartPos = ock->pos;
+            ock->moveTargetPos = ock->pos;
+            dungeonRoomEnemies[dungeonRoomEnemyCount++] = ock;
+        }
+
+        return;
+    }
+
+    if (isDungeon3BossRoom)
+    {
+        const float tileSize = activeDungeon->currentTileWorldSizeValue();
+        const vec3 bossSpawn = activeDungeon->currentWorldPositionForTile(13.0f, 7.0f);
+        const vec3 centlySpawns[2] =
+        {
+            activeDungeon->currentWorldPositionForTile(7.0f, 5.0f),
+            activeDungeon->currentWorldPositionForTile(16.0f, 12.0f)
+        };
+        const vec3 moblinSpawn = activeDungeon->currentWorldPositionForTile(8.0f, 14.0f);
+
+        _boss3* boss = new _boss3();
+        boss->initBoss3();
+        boss->tileStepDistance = tileSize;
+        boss->pos = bossSpawn;
+        boss->moveStartPos = boss->pos;
+        boss->moveTargetPos = boss->pos;
+        dungeonRoomEnemies[dungeonRoomEnemyCount++] = boss;
+
+        for (int i = 0; i < 2 && dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES; i++)
+        {
+            _enemyCently* cently = new _enemyCently();
+            cently->initCently();
+            cently->tileStepDistance = tileSize;
+            cently->pos = centlySpawns[i];
+            cently->moveStartPos = cently->pos;
+            cently->moveTargetPos = cently->pos;
+            dungeonRoomEnemies[dungeonRoomEnemyCount++] = cently;
+        }
+
+        if (dungeonRoomEnemyCount < MAX_OVERWORLD_ENEMIES)
+        {
+            _enemyMoblin* moblin = new _enemyMoblin();
+            moblin->initMoblin();
+            moblin->tileStepDistance = tileSize;
+            moblin->pos = moblinSpawn;
+            moblin->moveStartPos = moblin->pos;
+            moblin->moveTargetPos = moblin->pos;
+            dungeonRoomEnemies[dungeonRoomEnemyCount++] = moblin;
+        }
+
+        return;
+    }
+
+    if ((isDungeon1Room && roomName == "top_room") ||
+        (isDungeon2Room && roomName == "left_room") ||
+        (isDungeon3Room && roomName == "left_room"))
+    {
         return;
     }
 
@@ -439,17 +663,22 @@ void _scene::enterOverworldRoomForDungeon(const _dungeon* dungeon)
     }
 }
 
-bool _scene::isDungeon1BossRoomActive() const
+bool _scene::isDungeonBossRoomActive() const
 {
-    return inDungeon &&
-           activeDungeon != NULL &&
-           activeDungeon == dungeon1 &&
-           activeDungeon->currentRoomName() == "bottom_room";
+    if (!inDungeon || activeDungeon == NULL)
+    {
+        return false;
+    }
+
+    const std::string roomName = activeDungeon->currentRoomName();
+    return (activeDungeon == dungeon1 && roomName == "bottom_room") ||
+           (activeDungeon == dungeon2 && roomName == "boss_room") ||
+           (activeDungeon == dungeon3 && roomName == "boss_room");
 }
 
-bool _scene::isDungeon1BossRoomCleared() const
+bool _scene::isDungeonBossRoomCleared() const
 {
-    if (!isDungeon1BossRoomActive() || dungeonRoomEnemyCount <= 0)
+    if (!isDungeonBossRoomActive() || dungeonRoomEnemyCount <= 0)
     {
         return false;
     }
@@ -465,19 +694,29 @@ bool _scene::isDungeon1BossRoomCleared() const
     return true;
 }
 
-rect2D _scene::dungeon1BossReturnTriggerBounds() const
+rect2D _scene::dungeonBossReturnTriggerBounds() const
 {
-    if (!isDungeon1BossRoomActive())
+    if (!isDungeonBossRoomActive())
     {
         return makeRect(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
-    return activeDungeon->currentWorldRectForTiles(9, 10, 10, 11);
+    if (activeDungeon == dungeon1)
+    {
+        return activeDungeon->currentWorldRectForTiles(9, 10, 10, 11);
+    }
+
+    if (activeDungeon == dungeon2)
+    {
+        return activeDungeon->currentWorldRectForTiles(9, 10, 9, 10);
+    }
+
+    return activeDungeon->currentWorldRectForTiles(9, 10, 9, 10);
 }
 
-void _scene::drawDungeon1BossReturnTrigger() const
+void _scene::drawDungeonBossReturnTrigger() const
 {
-    if (!isDungeon1BossRoomCleared())
+    if (!isDungeonBossRoomCleared())
     {
         return;
     }
@@ -486,7 +725,7 @@ void _scene::drawDungeon1BossReturnTrigger() const
         chrono::steady_clock::now().time_since_epoch()
     ).count();
     const float pulse = 0.72f + 0.28f * (float)((sin(elapsedSeconds * 4.0) + 1.0) * 0.5);
-    drawExitTriggerSprite(dungeon1BossReturnTriggerBounds(), pulse, 0.22f + (0.18f * pulse));
+    drawExitTriggerSprite(dungeonBossReturnTriggerBounds(), pulse, 0.22f + (0.18f * pulse));
 }
 
 void _scene::drawExitTriggerSprite(rect2D triggerBounds, float pulse, float fillAlpha) const
@@ -576,9 +815,91 @@ bool _scene::doesRectHitPlayer(rect2D rect) const
     return hit != NULL && ply != NULL && hit->isRectCollide(rect, ply->collisionBounds());
 }
 
+bool _scene::tryDamagePlayer(rect2D rect) const
+{
+    if (hit == NULL || ply == NULL || !hit->isRectCollide(rect, ply->collisionBounds()))
+    {
+        return false;
+    }
+
+    const bool tookHit = ply->takeHit(1);
+
+    if (!tookHit)
+    {
+        return false;
+    }
+
+    ply->pos = playerKnockbackTarget(rect);
+
+    if (!ply->isAlive())
+    {
+        const_cast<_scene*>(this)->startGameOver();
+    }
+
+    return true;
+}
+
 bool _scene::doesRectHitWall(rect2D rect) const
 {
     return collidesWithWall(rect);
+}
+
+float _scene::currentPlayerTileSize() const
+{
+    if (inDungeon && activeDungeon != NULL)
+    {
+        return activeDungeon->currentTileWorldSizeValue();
+    }
+
+    if (overworld != NULL && overworld->isLoaded())
+    {
+        return overworld->currentTileWorldSizeValue();
+    }
+
+    return 0.5f;
+}
+
+vec3 _scene::playerKnockbackTarget(rect2D sourceRect) const
+{
+    vec3 target = ply->pos;
+    const float tileSize = currentPlayerTileSize();
+    const float playerCenterX = (float)ply->pos.x;
+    const float playerCenterY = (float)ply->pos.y + ply->collisionOffsetY;
+    const float sourceCenterX = (sourceRect.left + sourceRect.right) * 0.5f;
+    const float sourceCenterY = (sourceRect.bottom + sourceRect.top) * 0.5f;
+    const float deltaX = playerCenterX - sourceCenterX;
+    const float deltaY = playerCenterY - sourceCenterY;
+
+    if (fabs(deltaX) >= fabs(deltaY))
+    {
+        target.x += deltaX >= 0.0f ? tileSize : -tileSize;
+    }
+    else
+    {
+        target.y += deltaY >= 0.0f ? tileSize : -tileSize;
+    }
+
+    if (!collidesWithWall(target) && !fallsIntoPit(target))
+    {
+        return target;
+    }
+
+    target = ply->pos;
+    if (fabs(deltaX) >= fabs(deltaY))
+    {
+        target.y += deltaY >= 0.0f ? tileSize : -tileSize;
+    }
+    else
+    {
+        target.x += deltaX >= 0.0f ? tileSize : -tileSize;
+    }
+
+    if (!collidesWithWall(target) && !fallsIntoPit(target))
+    {
+        return target;
+    }
+
+    return ply->pos;
 }
 
 rect2D _scene::currentOverworldDungeonEntranceZone() const
@@ -670,6 +991,168 @@ void _scene::respawnPlayer()
     }
 }
 
+void _scene::startGameOver()
+{
+    if (isGameOver)
+    {
+        return;
+    }
+
+    isGameOver = true;
+    gameOverTimer = 0.0f;
+    ply->finishAttack();
+    ply->actionTrigger = ply->STAND;
+    myKbMs->resetPlayerInput();
+}
+
+void _scene::resetGameplaySession()
+{
+    isGameOver = false;
+    gameOverTimer = 0.0f;
+    inDungeon = false;
+    activeDungeon = NULL;
+
+    myKbMs->resetPlayerInput();
+    ply->resetHealth();
+    ply->finishAttack();
+    ply->actionTrigger = ply->STAND;
+
+    clearEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+    clearEnemyGroup(overworldEnemies, overworldEnemyCount);
+    clearHealthPickups();
+    setupOverworld();
+    setupDungeon();
+    initOverworldEnemies();
+
+    stateManager->currentState = PLAYING;
+    lastTime = chrono::steady_clock::now();
+}
+
+void _scene::drawHud() const
+{
+    if (hudFont == NULL || ply == NULL)
+    {
+        return;
+    }
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(-1.0, 1.0, -1.0, 1.0, -100.0, 100.0);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+
+    glColor4f(1.0f, 1.0f, 1.0f, 0.58f);
+    glBegin(GL_QUADS);
+        glVertex3f(-0.97f, 0.64f, -10.0f);
+        glVertex3f(-0.42f, 0.64f, -10.0f);
+        glVertex3f(-0.42f, 0.96f, -10.0f);
+        glVertex3f(-0.97f, 0.96f, -10.0f);
+    glEnd();
+
+    glEnable(GL_TEXTURE_2D);
+    hudFont->setPosition(-0.92f, 0.86f, -9.0f);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    hudFont->drawFonts();
+
+    const float squareSize = 0.065f;
+    const float squareGap = 0.025f;
+    const float squareStartX = -0.91f;
+    const float squareBottom = 0.69f;
+
+    glDisable(GL_TEXTURE_2D);
+    for (int i = 0; i < ply->totalHitPoints(); i++)
+    {
+        const bool isFilled = i < ply->currentHitPoints();
+        const float left = squareStartX + i * (squareSize + squareGap);
+        const float right = left + squareSize;
+        const float top = squareBottom + squareSize;
+
+        if (isFilled)
+        {
+            glColor4f(0.86f, 0.14f, 0.14f, 0.96f);
+        }
+        else
+        {
+            glColor4f(0.45f, 0.45f, 0.45f, 0.92f);
+        }
+
+        glBegin(GL_QUADS);
+            glVertex3f(left, squareBottom, -9.0f);
+            glVertex3f(right, squareBottom, -9.0f);
+            glVertex3f(right, top, -9.0f);
+            glVertex3f(left, top, -9.0f);
+        glEnd();
+
+        glColor4f(0.16f, 0.16f, 0.16f, 0.92f);
+        glBegin(GL_LINE_LOOP);
+            glVertex3f(left, squareBottom, -8.95f);
+            glVertex3f(right, squareBottom, -8.95f);
+            glVertex3f(right, top, -8.95f);
+            glVertex3f(left, top, -8.95f);
+        glEnd();
+    }
+
+    glEnable(GL_TEXTURE_2D);
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+}
+
+void _scene::drawGameOverScreen() const
+{
+    if (gameOverFont == NULL)
+    {
+        return;
+    }
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(-1.0, 1.0, -1.0, 1.0, -100.0, 100.0);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+        glVertex3f(-1.0f, -1.0f, -10.0f);
+        glVertex3f(1.0f, -1.0f, -10.0f);
+        glVertex3f(1.0f, 1.0f, -10.0f);
+        glVertex3f(-1.0f, 1.0f, -10.0f);
+    glEnd();
+
+    glEnable(GL_TEXTURE_2D);
+    gameOverFont->setPosition(-0.46f, 0.03f, -9.0f);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    gameOverFont->drawFonts();
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+}
+
 // DRAW COLLISION BOXES
 void _scene::drawCollisionDebug() const
 {
@@ -690,9 +1173,9 @@ void _scene::drawCollisionDebug() const
         {
             activeDungeon->drawCollisionDebug();
 
-            if (isDungeon1BossRoomCleared())
+            if (isDungeonBossRoomCleared())
             {
-                const rect2D triggerBounds = dungeon1BossReturnTriggerBounds();
+                const rect2D triggerBounds = dungeonBossReturnTriggerBounds();
                 glColor3f(0.95f, 1.0f, 0.65f);
                 glBegin(GL_LINE_LOOP);
                     glVertex3f(triggerBounds.left, triggerBounds.bottom, debugZ);
@@ -799,6 +1282,7 @@ void _scene::updateAndDrawEnemyGroup(_enemies* enemies[], int& enemyCount)
     const bool playerAttackActive = ply->isAttackActive;
     const int playerAttackId = ply->currentAttackId();
     const rect2D playerAttackBox = playerAttackActive ? ply->attackBounds() : rect2D();
+    const float pickupTileSize = currentPlayerTileSize();
 
     for (int i = 0; i < enemyCount; i++)
     {
@@ -807,6 +1291,7 @@ void _scene::updateAndDrawEnemyGroup(_enemies* enemies[], int& enemyCount)
             continue;
         }
 
+        const bool wasAliveAtFrameStart = enemies[i]->isEnmsLive;
         vec3 previousEnemyPos = enemies[i]->pos;
         enemies[i]->enmsActions(deltaTime, &ply->pos, this);
 
@@ -831,6 +1316,24 @@ void _scene::updateAndDrawEnemyGroup(_enemies* enemies[], int& enemyCount)
 
         if (!enemies[i]->isEnmsLive)
         {
+            if (wasAliveAtFrameStart)
+            {
+                maybeSpawnHealthPickup(enemies[i]->pos, pickupTileSize);
+            }
+            continue;
+        }
+
+        tryDamagePlayer(enemies[i]->collisionBounds());
+        enemies[i]->drawEnms();
+    }
+}
+
+void _scene::drawEnemyGroup(_enemies* enemies[], int enemyCount) const
+{
+    for (int i = 0; i < enemyCount; i++)
+    {
+        if (enemies[i] == NULL || !enemies[i]->isEnmsLive)
+        {
             continue;
         }
 
@@ -844,7 +1347,7 @@ void _scene::drawScene()
     auto currenTime = chrono::steady_clock::now();
 
     chrono::duration<float> elapsed = currenTime - lastTime;
-    if (stateManager->currentState == PLAYING) {
+    if (stateManager->currentState == PLAYING && !isGameOver) {
         _scene::deltaTime = elapsed.count();
     } else {
         _scene::deltaTime = 0.0f;
@@ -854,6 +1357,19 @@ void _scene::drawScene()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);   // Clear buffers
     glLoadIdentity();
     glColor3f(0.232,0.193,0.0); // set color for my model
+
+    if (isGameOver)
+    {
+        gameOverTimer += elapsed.count();
+        drawGameOverScreen();
+
+        if (gameOverTimer >= gameOverRestartDelay)
+        {
+            resetGameplaySession();
+        }
+
+        return;
+    }
 
     //glTranslatef(0.0,0.0,-8.0); // move model to the center and back
     //glutSolidTeapot(1.5);   // draw teapot
@@ -969,25 +1485,51 @@ void _scene::drawScene()
             }
         }
 
-        if (!inDungeon)
+        if (stateManager->currentState == PLAYING)
         {
-            updateAndDrawEnemyGroup(overworldEnemies, overworldEnemyCount);
-        }
-        else if (activeDungeon == dungeon1 || activeDungeon == dungeon2 || activeDungeon == dungeon3)
-        {
-            updateAndDrawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
-
-            if (isDungeon1BossRoomCleared() &&
-                hit->isRectCollide(ply->collisionBounds(), dungeon1BossReturnTriggerBounds()))
+            if (!inDungeon)
             {
-                exitDungeon();
+                updateAndDrawEnemyGroup(overworldEnemies, overworldEnemyCount);
             }
+            else if (activeDungeon == dungeon1 || activeDungeon == dungeon2 || activeDungeon == dungeon3)
+            {
+                updateAndDrawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+
+                if (isDungeonBossRoomCleared() &&
+                    hit->isRectCollide(ply->collisionBounds(), dungeonBossReturnTriggerBounds()))
+                {
+                    exitDungeon();
+                }
+            }
+        }
+        else
+        {
+            if (!inDungeon)
+            {
+                drawEnemyGroup(overworldEnemies, overworldEnemyCount);
+            }
+            else if (activeDungeon == dungeon1 || activeDungeon == dungeon2 || activeDungeon == dungeon3)
+            {
+                drawEnemyGroup(dungeonRoomEnemies, dungeonRoomEnemyCount);
+            }
+        }
+
+        if (stateManager->currentState == PLAYING)
+        {
+            updateHealthPickups();
+        }
+        drawHealthPickups();
+
+        if (isGameOver)
+        {
+            drawGameOverScreen();
+            return;
         }
 
         if (inDungeon)
         {
             drawActiveDungeonReturnTriggers();
-            drawDungeon1BossReturnTrigger();
+            drawDungeonBossReturnTrigger();
         }
 
         ply->updateQuad();
@@ -1033,6 +1575,11 @@ void _scene::drawScene()
 
     stateManager->draw();
 
+    if (stateManager->currentState == PLAYING || stateManager->currentState == POPUP_MENU)
+    {
+        drawHud();
+    }
+
 
 
 
@@ -1065,6 +1612,12 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     float mouseX = LOWORD(lParam);
     float mouseY = HIWORD(lParam);
+
+    if (isGameOver)
+    {
+        return 0;
+    }
+
     switch(uMsg){
     case WM_KEYDOWN:
         if (wParam == VK_F2)
@@ -1128,7 +1681,13 @@ int _scene::winMsg(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         myKbMs->mouseWheel(Mymodel, (double)GET_WHEEL_DELTA_WPARAM(wParam));
         break;
     }
+    const GameState previousState = stateManager->currentState;
     stateManager->processInput(uMsg, wParam, mouseX, mouseY, dim.x, dim.y);    //State manager inputs
+
+    if (previousState == MAIN_MENU && stateManager->currentState == PLAYING)
+    {
+        resetGameplaySession();
+    }
 
 
     return 0;

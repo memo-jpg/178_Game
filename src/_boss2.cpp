@@ -1,66 +1,68 @@
-#include "_enemyMoblin.h"
+#include "_boss2.h"
 #include <limits>
 #include <queue>
 
 namespace
 {
-    struct GridNode
+    struct Boss2GridNode
     {
         int x;
         int y;
     };
 
-    struct QueueNode
+    struct Boss2QueueNode
     {
         float cost;
-        GridNode node;
+        Boss2GridNode node;
     };
 
-    struct QueueNodeCompare
+    struct Boss2QueueNodeCompare
     {
-        bool operator()(const QueueNode& a, const QueueNode& b) const
+        bool operator()(const Boss2QueueNode& a, const Boss2QueueNode& b) const
         {
             return a.cost > b.cost;
         }
     };
 
-    int flattenedIndex(int x, int y, int diameter)
+    int boss2FlattenedIndex(int x, int y, int diameter)
     {
         return (y * diameter) + x;
     }
 }
 
-_enemyMoblin::_enemyMoblin()
+_boss2::_boss2()
 {
-    pos.x = -1.25f;
+    pos.x = 0.0f;
     pos.y = -0.85f;
     pos.z = -8.0f;
 
-    scale.x = 0.245f;
-    scale.y = 0.245f;
+    scale.x = 0.32f;
+    scale.y = 0.32f;
     scale.z = 1.0f;
 
-    maxHealth = 3;
-    health = 3;
+    maxHealth = 12;
+    health = 12;
     actionTrigger = STAND;
-    moveInterval = 0.5f;
-    moveDuration = 0.35f;
+    moveInterval = 0.3f;
+    moveDuration = 0.24f;
+    knockbackDuration = 0.12f;
 }
 
-_enemyMoblin::~_enemyMoblin()
+_boss2::~_boss2()
 {
-    //dtor
 }
 
-void _enemyMoblin::initMoblin()
+void _boss2::initBoss2()
 {
     const int enemySheetWidth = 437;
     const int enemySheetHeight = 346;
     const int moblinRegionWidth = 120;
     const int moblinRegionHeight = 60;
 
-    enmsInit(4, 2, "images/enemies_sheet.png");
-    setSpriteRegionPixels(
+    initBossSprite(
+        4,
+        2,
+        "images/enemies_sheet.png",
         enemySheetWidth,
         enemySheetHeight,
         0,
@@ -70,14 +72,14 @@ void _enemyMoblin::initMoblin()
     );
 }
 
-bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec3* playerPos, const _enemyNavigation* navigation) const
+bool _boss2::chooseNextDirection(FacingDirection& nextDirection, const vec3* playerPos, const _enemyNavigation* navigation) const
 {
     if (playerPos == NULL || navigation == NULL || tileStepDistance <= 0.0f)
     {
         return false;
     }
 
-    const int maxSearchRadius = 14;
+    const int maxSearchRadius = 18;
     const int diameter = maxSearchRadius * 2 + 1;
     const int totalNodes = diameter * diameter;
     const float tileSize = tileStepDistance;
@@ -90,7 +92,7 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
 
     const int startGridX = maxSearchRadius;
     const int startGridY = maxSearchRadius;
-    const int startIndex = flattenedIndex(startGridX, startGridY, diameter);
+    const int startIndex = boss2FlattenedIndex(startGridX, startGridY, diameter);
 
     int goalGridX = (int)round((((float)playerPos->x) - (float)pos.x) / tileSize) + maxSearchRadius;
     int goalGridY = (int)round((((float)playerPos->y) - (float)pos.y) / tileSize) + maxSearchRadius;
@@ -102,7 +104,7 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
     {
         for (int gridX = 0; gridX < diameter; gridX++)
         {
-            const int nodeIndex = flattenedIndex(gridX, gridY, diameter);
+            const int nodeIndex = boss2FlattenedIndex(gridX, gridY, diameter);
             vec3 candidatePos = pos;
             candidatePos.x += (float)(gridX - startGridX) * tileSize;
             candidatePos.y += (float)(gridY - startGridY) * tileSize;
@@ -118,15 +120,15 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
         }
     }
 
-    std::priority_queue<QueueNode, std::vector<QueueNode>, QueueNodeCompare> frontier;
+    std::priority_queue<Boss2QueueNode, std::vector<Boss2QueueNode>, Boss2QueueNodeCompare> frontier;
     distance[startIndex] = 0.0f;
-    frontier.push(QueueNode{0.0f, GridNode{startGridX, startGridY}});
+    frontier.push(Boss2QueueNode{0.0f, Boss2GridNode{startGridX, startGridY}});
 
-    const GridNode offsets[4] = {
-        GridNode{-1, 0},
-        GridNode{1, 0},
-        GridNode{0, -1},
-        GridNode{0, 1}
+    const Boss2GridNode offsets[4] = {
+        Boss2GridNode{-1, 0},
+        Boss2GridNode{1, 0},
+        Boss2GridNode{0, -1},
+        Boss2GridNode{0, 1}
     };
 
     int bestIndex = startIndex;
@@ -134,10 +136,10 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
 
     while (!frontier.empty())
     {
-        const QueueNode current = frontier.top();
+        const Boss2QueueNode current = frontier.top();
         frontier.pop();
 
-        const int currentIndex = flattenedIndex(current.node.x, current.node.y, diameter);
+        const int currentIndex = boss2FlattenedIndex(current.node.x, current.node.y, diameter);
         if (visited[currentIndex])
         {
             continue;
@@ -174,7 +176,7 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
                 continue;
             }
 
-            const int nextIndex = flattenedIndex(nextGridX, nextGridY, diameter);
+            const int nextIndex = boss2FlattenedIndex(nextGridX, nextGridY, diameter);
             if (!walkable[nextIndex])
             {
                 continue;
@@ -188,7 +190,7 @@ bool _enemyMoblin::chooseNextDirection(FacingDirection& nextDirection, const vec
 
             distance[nextIndex] = nextCost;
             previous[nextIndex] = currentIndex;
-            frontier.push(QueueNode{nextCost, GridNode{nextGridX, nextGridY}});
+            frontier.push(Boss2QueueNode{nextCost, Boss2GridNode{nextGridX, nextGridY}});
         }
     }
 

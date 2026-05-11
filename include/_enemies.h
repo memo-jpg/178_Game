@@ -13,6 +13,7 @@ class _enemyNavigation
         virtual ~_enemyNavigation() {}
         virtual bool isEnemyPositionWalkable(const _enemies*, vec3) const = 0;
         virtual bool doesRectHitPlayer(rect2D) const = 0;
+        virtual bool tryDamagePlayer(rect2D) const = 0;
         virtual bool doesRectHitWall(rect2D) const = 0;
 };
 

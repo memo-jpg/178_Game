@@ -208,8 +208,15 @@ bool _enemies::chooseNextDirection(FacingDirection& nextDirection, const vec3* p
 
 rect2D _enemies::collisionBoundsAt(vec3 position) const
 {
-    const float halfWidth = (float)scale.x * collisionWidthScale;
-    const float halfHeight = (float)scale.y * collisionHeightScale;
+    float halfWidth = tileStepDistance * 0.5f;
+    float halfHeight = tileStepDistance * 0.5f;
+
+    if (tileStepDistance <= 0.0f)
+    {
+        halfWidth = (float)scale.x * collisionWidthScale;
+        halfHeight = (float)scale.y * collisionHeightScale;
+    }
+
     const float centerY = (float)position.y + collisionOffsetY;
 
     rect2D bounds;

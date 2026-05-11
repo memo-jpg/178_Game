@@ -16,6 +16,7 @@
 #include<_particles.h>
 #include<_shader.h>
 #include<_gamestate.h>
+#include<_fonts.h>
 #include<_overworld.h>
 #include<_dungeon1.h>
 #include<_dungeon2.h>
@@ -49,6 +50,7 @@ class _scene: public _enemyNavigation
         void drawCollisionDebug() const;
         bool isEnemyPositionWalkable(const _enemies*, vec3) const;
         bool doesRectHitPlayer(rect2D) const;
+        bool tryDamagePlayer(rect2D) const;
         bool doesRectHitWall(rect2D) const;
         static float deltaTime;
         static const int MAX_OVERWORLD_ENEMIES = 20;
@@ -65,6 +67,8 @@ class _scene: public _enemyNavigation
         _sounds *sfx = new _sounds();
         _collisionCheck *hit = new _collisionCheck();
         _gameState *stateManager = new _gameState;
+        _fonts *hudFont = new _fonts();
+        _fonts *gameOverFont = new _fonts();
         _dungeon *overworld = new _overworld();
         _dungeon *dungeon1 = new _dungeon1();
         _dungeon *dungeon2 = new _dungeon2();
@@ -84,30 +88,52 @@ class _scene: public _enemyNavigation
         std::vector<rect2D> pitZones;
         vec3 playerSpawn;
         bool inDungeon = false;
-        bool showCollisionDebug = true;
+        bool showCollisionDebug = false;
+        bool isGameOver = false;
+        float gameOverTimer = 0.0f;
+        float gameOverRestartDelay = 2.0f;
 
     protected:
 
     private:
+        struct HealthPickup
+        {
+            vec3 pos;
+            float halfSize;
+            bool active;
+        };
+
         _enemies* overworldEnemies[MAX_OVERWORLD_ENEMIES];
         int overworldEnemyCount;
         _enemies* dungeonRoomEnemies[MAX_OVERWORLD_ENEMIES];
         int dungeonRoomEnemyCount;
+        std::vector<HealthPickup> healthPickups;
 
         void initOverworldEnemies();
         void clearEnemyGroup(_enemies*[], int&);
+        void clearHealthPickups();
+        void maybeSpawnHealthPickup(vec3, float);
+        void updateHealthPickups();
+        void drawHealthPickups() const;
         void spawnDungeonRoomEnemies();
+        void drawEnemyGroup(_enemies*[], int) const;
         void updateAndDrawEnemyGroup(_enemies*[], int&);
         void enterOverworldRoomForDungeon(const _dungeon*);
         void drawExitTriggerSprite(rect2D, float, float) const;
         void drawActiveDungeonReturnTriggers() const;
-        bool isDungeon1BossRoomActive() const;
-        bool isDungeon1BossRoomCleared() const;
-        rect2D dungeon1BossReturnTriggerBounds() const;
-        void drawDungeon1BossReturnTrigger() const;
+        bool isDungeonBossRoomActive() const;
+        bool isDungeonBossRoomCleared() const;
+        rect2D dungeonBossReturnTriggerBounds() const;
+        void drawDungeonBossReturnTrigger() const;
         rect2D currentOverworldDungeonEntranceZone() const;
         bool collidesWithWall(rect2D) const;
         bool fallsIntoPit(rect2D) const;
+        float currentPlayerTileSize() const;
+        vec3 playerKnockbackTarget(rect2D) const;
+        void drawHud() const;
+        void drawGameOverScreen() const;
+        void startGameOver();
+        void resetGameplaySession();
 };
 
 #endif // _SCENE_H

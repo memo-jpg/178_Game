@@ -16,10 +16,14 @@ class _player:public _quad
         float collisionWidthScale;
         float collisionHeightScale;
         float collisionOffsetY;
+        float invulnerabilityTimer;
+        float invulnerabilityDuration;
         int xFrames, yFrames;
         int currentFrame;
         int attackId;
         int actionTrigger;
+        int maxHitPoints;
+        int hitPoints;
         enum{STAND, LEFTWALK, RIGHTWALK, RUN, JUMP, ATTACK, WALKUP, WALKDOWN};
         enum FacingDirection{FACE_DOWN, FACE_LEFT, FACE_RIGHT, FACE_UP};
 
@@ -39,6 +43,13 @@ class _player:public _quad
         rect2D collisionBounds() const;
         quad2D attackQuad() const;
         rect2D attackBounds() const;
+        bool takeHit(int damage = 1);
+        bool heal(int amount = 1);
+        void resetHealth();
+        bool isAlive() const;
+        int currentHitPoints() const;
+        int totalHitPoints() const;
+        bool isInvulnerable() const;
 
     protected:
 
